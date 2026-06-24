@@ -774,6 +774,27 @@
               if (!wsRoute) {
                 throw new Error("Could not find 'Route plan' sheet in the uploaded file.");
               }
+
+              // Dynamically build output filename based on date in wsRoute.name (e.g. "Route plan 23.06.2026")
+              let outputFileName = 'data 1.xlsx';
+              const match = wsRoute.name.match(/Route plan\s+(\d{1,2})[\.\-/](\d{1,2})[\.\-/](\d{4})/i);
+              if (match) {
+                const day = parseInt(match[1], 10);
+                const month = parseInt(match[2], 10);
+                const year = match[3];
+                const monthNames = [
+                  "January", "February", "March", "April", "May", "June",
+                  "July", "August", "September", "October", "November", "December"
+                ];
+                const monthName = monthNames[month - 1] || 'June';
+
+                let suffix = 'th';
+                if (day % 10 === 1 && day !== 11) suffix = 'st';
+                else if (day % 10 === 2 && day !== 12) suffix = 'nd';
+                else if (day % 10 === 3 && day !== 13) suffix = 'rd';
+
+                outputFileName = `${day}${suffix} ${monthName} ${year} BLR FUR FWD Planning.xlsx`;
+              }
               
               const routeRowsCount = wsRoute.rowCount;
               let invoiceCount = 0;
@@ -1028,11 +1049,11 @@
               progressText.textContent = 'Formatting and packaging...';
               
               const buffer = await workbook.xlsx.writeBuffer();
-              triggerDownload(buffer, 'data 1.xlsx');
+              triggerDownload(buffer, outputFileName);
               
               progressBar.style.width = '100%';
               progressContainer.style.display = 'none';
-              showMessage(`Successfully generated sheets (INVOICE: ${invoiceCount} rows, SER-PARTS: ${serPartsCount} rows, ROUTE: ${routeCount} rows) and downloaded data 1.xlsx!`, 'success');
+              showMessage(`Successfully generated sheets (INVOICE: ${invoiceCount} rows, SER-PARTS: ${serPartsCount} rows, ROUTE: ${routeCount} rows) and downloaded ${outputFileName}!`, 'success');
             }
           } catch (err) {
             console.error(err);
