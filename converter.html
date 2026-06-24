@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wakefit Logistics — Excel Sync Tool</title>
+  <!-- ExcelJS CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+  <!-- Outfit Google Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-color: #0b0f19;
+      --card-bg: rgba(20, 28, 47, 0.6);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text-main: #f3f4f6;
+      --text-sub: #9ca3af;
+      --primary: #10b981; /* Emerald */
+      --primary-hover: #059669;
+      --accent: #06b6d4; /* Cyan */
+      --glow-color: rgba(16, 185, 129, 0.15);
+      --error: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(6, 182, 212, 0.1) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.1) 0px, transparent 50%);
+    }
+
+    .container {
+      width: 100%;
+      max-width: 650px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(16px) saturate(180%);
+      border-radius: 24px;
+      padding: 2.5rem;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 0 50px var(--glow-color);
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    header {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    h1 {
+      font-size: 2.25rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--text-main) 30%, var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.02em;
+    }
+
+    p.subtitle {
+      color: var(--text-sub);
+      font-size: 1rem;
+      font-weight: 400;
+    }
+
+    /* Drop Zone styling */
+    .drop-zone {
+      border: 2px dashed rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      padding: 3.5rem 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--primary);
+      background: rgba(16, 185, 129, 0.05);
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.1) inset;
+    }
+
+    /* Trip ID drop zone — accent colour scheme */
+    .drop-zone-trip {
+      border: 2px dashed rgba(6, 182, 212, 0.35);
+      border-radius: 16px;
+      padding: 2rem 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      background: rgba(6, 182, 212, 0.04);
+    }
+
+    .drop-zone-trip:hover, .drop-zone-trip.dragover {
+      border-color: var(--accent);
+      background: rgba(6, 182, 212, 0.08);
+      box-shadow: 0 0 20px rgba(6, 182, 212, 0.1) inset;
+    }
+
+    .trip-section-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.25rem;
+    }
+
+    .trip-status {
+      display: none;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 0.88rem;
+      color: var(--accent);
+      background: rgba(6, 182, 212, 0.08);
+      border: 1px solid rgba(6, 182, 212, 0.2);
+      border-radius: 10px;
+      padding: 0.6rem 1rem;
+      margin-top: 0.25rem;
+    }
+
+    .trip-status.visible { display: flex; }
+
+    .drop-icon {
+      font-size: 3rem;
+      color: var(--text-sub);
+      transition: color 0.3s;
+    }
+
+    .drop-zone:hover .drop-icon, .drop-zone.dragover .drop-icon {
+      color: var(--primary);
+      transform: scale(1.05);
+    }
+
+    .drop-zone-trip:hover .drop-icon, .drop-zone-trip.dragover .drop-icon {
+      color: var(--accent);
+      transform: scale(1.05);
+    }
+
+    .drop-text {
+      font-size: 1.1rem;
+      font-weight: 500;
+      color: var(--text-main);
+    }
+
+    .drop-text-sm {
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--text-main);
+    }
+
+    .drop-subtext {
+      font-size: 0.85rem;
+      color: var(--text-sub);
+    }
+
+    /* File details panel */
+    .file-details {
+      display: none;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      flex-direction: column;
+      gap: 0.75rem;
+      animation: fadeIn 0.4s ease-out;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.95rem;
+    }
+
+    .info-label {
+      color: var(--text-sub);
+    }
+
+    .info-val {
+      font-weight: 500;
+    }
+
+    .badge {
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .badge-data1 {
+      background: rgba(6, 182, 212, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+    }
+
+    .badge-data2 {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--primary);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    /* Actions / Conversion status */
+    .action-panel {
+      display: none;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    button.btn-convert {
+      width: 100%;
+      background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 1rem;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+    }
+
+    button.btn-convert:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);
+    }
+
+    button.btn-convert:active {
+      transform: translateY(0);
+    }
+
+    /* Loader */
+    .progress-container {
+      display: none;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .progress-bar-bg {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 9999px;
+      height: 8px;
+      overflow: hidden;
+      width: 100%;
+    }
+
+    .progress-bar {
+      background: var(--primary);
+      height: 100%;
+      width: 0%;
+      transition: width 0.3s ease-out;
+    }
+
+    .progress-text {
+      font-size: 0.9rem;
+      color: var(--text-sub);
+      text-align: center;
+    }
+
+    /* Alert / Messages */
+    .alert {
+      display: none;
+      padding: 1rem;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      line-height: 1.4;
+      animation: fadeIn 0.3s;
+    }
+
+    .alert-success {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      color: #34d399;
+    }
+
+    .alert-error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      color: #f87171;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Wakefit Logistics Converter</h1>
+      <p class="subtitle">Drag & drop excel files to sync & format sheets instantly</p>
+    </header>
+
+    <!-- Invisible file inputs -->
+    <input type="file" id="fileInput" accept=".xlsx" style="display: none;">
+    <input type="file" id="tripFileInput" accept=".xlsx" style="display: none;">
+
+    <!-- Step 1: Route Planning File -->
+    <div class="trip-section-label">Step 1 — Route Planning File</div>
+    <div class="drop-zone" id="dropZone">
+      <div class="drop-icon">📊</div>
+      <div class="drop-text" id="dropText">Choose Route Planning file or drag it here</div>
+      <div class="drop-subtext">Supports .xlsx spreadsheets (data 2.xlsx)</div>
+    </div>
+
+    <div class="file-details" id="fileDetails">
+      <div class="info-row">
+        <span class="info-label">File Name:</span>
+        <span class="info-val" id="fileName">data 2.xlsx</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">File Size:</span>
+        <span class="info-val" id="fileSize">1.08 MB</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Detected Format:</span>
+        <span class="badge" id="fileBadge">data 2 (no Invoice)</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Conversion Target:</span>
+        <span class="info-val" id="conversionTarget" style="color: var(--accent); font-weight: 600;">data 1.xlsx (add Invoice)</span>
+      </div>
+    </div>
+
+    <!-- Step 2: Trip ID File (optional) -->
+    <div class="trip-section-label">Step 2 — Trip ID File <span style="font-weight:400; color:var(--text-sub); text-transform:none; letter-spacing:0;">(optional — fills Trip Id column)</span></div>
+    <div class="drop-zone-trip" id="tripDropZone">
+      <div class="drop-icon" style="font-size:2rem;">🚚</div>
+      <div class="drop-text-sm" id="tripDropText">Upload Trip Number file here</div>
+      <div class="drop-subtext">File must have: Col A = Trip Number, Col B = Consignment Number</div>
+    </div>
+    <div class="trip-status" id="tripStatus">
+      <span>✅</span>
+      <span id="tripStatusText">Trip ID file loaded — 0 entries mapped</span>
+    </div>
+
+    <div class="progress-container" id="progressContainer">
+      <div class="progress-bar-bg">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+      <div class="progress-text" id="progressText">Processing workbook...</div>
+    </div>
+
+    <div class="action-panel" id="actionPanel">
+      <button class="btn-convert" id="convertBtn">Convert & Download</button>
+    </div>
+
+    <div class="alert" id="statusAlert"></div>
+  </div>
+
+  <script>
+    const dropZone     = document.getElementById('dropZone');
+    const fileInput    = document.getElementById('fileInput');
+    const dropText     = document.getElementById('dropText');
+    const fileDetails  = document.getElementById('fileDetails');
+    const fileNameEl   = document.getElementById('fileName');
+    const fileSizeEl   = document.getElementById('fileSize');
+    const fileBadge    = document.getElementById('fileBadge');
+    const conversionTargetEl = document.getElementById('conversionTarget');
+    const actionPanel  = document.getElementById('actionPanel');
+    const convertBtn   = document.getElementById('convertBtn');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar  = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const statusAlert  = document.getElementById('statusAlert');
+
+    // Trip ID upload elements
+    const tripDropZone   = document.getElementById('tripDropZone');
+    const tripFileInput  = document.getElementById('tripFileInput');
+    const tripDropText   = document.getElementById('tripDropText');
+    const tripStatus     = document.getElementById('tripStatus');
+    const tripStatusText = document.getElementById('tripStatusText');
+
+    let currentFile = null;
+    let isData1 = false;
+    // Lookup map: consignmentNumber (UPPERCASE) -> tripNumber
+    let tripIdMap = {};
+
+    // ── Route Planning file drag & drop ──────────────────────────
+    dropZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) handleFileSelect(e.target.files[0]);
+    });
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault(); dropZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length > 0) handleFileSelect(e.dataTransfer.files[0]);
+    });
+
+    // ── Trip ID file drag & drop ──────────────────────────────────
+    tripDropZone.addEventListener('click', () => tripFileInput.click());
+    tripFileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) handleTripFileSelect(e.target.files[0]);
+    });
+    tripDropZone.addEventListener('dragover', (e) => { e.preventDefault(); tripDropZone.classList.add('dragover'); });
+    tripDropZone.addEventListener('dragleave', () => tripDropZone.classList.remove('dragover'));
+    tripDropZone.addEventListener('drop', (e) => {
+      e.preventDefault(); tripDropZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length > 0) handleTripFileSelect(e.dataTransfer.files[0]);
+    });
+
+    // ── Parse Trip ID Excel file ──────────────────────────────────
+    async function handleTripFileSelect(file) {
+      try {
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+          try {
+            const arrayBuffer = e.target.result;
+            const wb = new ExcelJS.Workbook();
+            await wb.xlsx.load(arrayBuffer);
+
+            // Use the first worksheet
+            const ws = wb.worksheets[0];
+            const newMap = {};
+            let count = 0;
+
+            ws.eachRow((row, rowNumber) => {
+              if (rowNumber === 1) return; // skip header
+              const tripNum  = (row.getCell(1).value || '').toString().trim();
+              const consNum  = (row.getCell(2).value || '').toString().trim().toUpperCase();
+              if (tripNum && consNum) {
+                newMap[consNum] = tripNum;
+                count++;
+              }
+            });
+
+            tripIdMap = newMap;
+            tripDropText.textContent = file.name;
+            tripStatusText.textContent = `Trip ID file loaded — ${count} entries mapped`;
+            tripStatus.classList.add('visible');
+            tripDropZone.style.borderColor = 'var(--accent)';
+          } catch (err) {
+            console.error(err);
+            alert('Error reading Trip ID file: ' + err.message);
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
+
+    function showMessage(text, type = 'success') {
+      statusAlert.textContent = text;
+      statusAlert.className = 'alert alert-' + type;
+      statusAlert.style.display = 'block';
+    }
+
+    function hideMessage() {
+      statusAlert.style.display = 'none';
+    }
+
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    async function handleFileSelect(file) {
+      currentFile = file;
+      hideMessage();
+      actionPanel.style.display = 'none';
+      progressContainer.style.display = 'none';
+      
+      fileNameEl.textContent = file.name;
+      fileSizeEl.textContent = formatBytes(file.size);
+      
+      // Let's quickly parse the file structure with ExcelJS to detect Data 1 vs Data 2
+      try {
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+          try {
+            const arrayBuffer = e.target.result;
+            const workbook = new ExcelJS.Workbook();
+            await workbook.xlsx.load(arrayBuffer);
+            
+            // Check if INVOICE sheet exists
+            const invoiceSheet = workbook.getWorksheet('INVOICE');
+            isData1 = !!invoiceSheet;
+            
+            if (isData1) {
+              fileBadge.className = 'badge badge-data1';
+              fileBadge.textContent = 'data 1 (contains Invoice)';
+              conversionTargetEl.textContent = 'data 2.xlsx (removes Invoice)';
+            } else {
+              fileBadge.className = 'badge badge-data2';
+              fileBadge.textContent = 'data 2 (no Invoice)';
+              conversionTargetEl.textContent = 'data 1.xlsx (adds Invoice)';
+            }
+            
+            fileDetails.style.display = 'flex';
+            actionPanel.style.display = 'flex';
+            dropText.textContent = file.name;
+          } catch (err) {
+            console.error(err);
+            showMessage('Error reading excel structure: ' + err.message, 'error');
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      } catch (err) {
+        showMessage('Error reading file: ' + err.message, 'error');
+      }
+    }
+
+    convertBtn.addEventListener('click', async () => {
+      if (!currentFile) return;
+      
+      hideMessage();
+      actionPanel.style.display = 'none';
+      progressContainer.style.display = 'flex';
+      progressBar.style.width = '10%';
+      progressText.textContent = 'Loading Excel file...';
+      
+      try {
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+          try {
+            const arrayBuffer = e.target.result;
+            progressBar.style.width = '30%';
+            progressText.textContent = 'Parsing workbook sheets...';
+            
+            const workbook = new ExcelJS.Workbook();
+            await workbook.xlsx.load(arrayBuffer);
+            
+            if (isData1) {
+              // Convert data 1 -> data 2 (Remove INVOICE, SER-PARTS, ROUTE sheets)
+              progressBar.style.width = '60%';
+              progressText.textContent = 'Removing generated sheets...';
+              
+              workbook.removeWorksheet('INVOICE');
+              workbook.removeWorksheet('TRIP ID');
+              workbook.removeWorksheet('SER-PARTS');
+              workbook.removeWorksheet('ROUTE');
+              
+              progressBar.style.width = '85%';
+              progressText.textContent = 'Writing Excel output...';
+              
+              const buffer = await workbook.xlsx.writeBuffer();
+              triggerDownload(buffer, 'data 2.xlsx');
+              
+              progressBar.style.width = '100%';
+              progressContainer.style.display = 'none';
+              showMessage('Successfully removed generated sheets and created data 2.xlsx!', 'success');
+              
+            } else {
+              // Convert data 2 -> data 1 (Add ROUTE, SER-PARTS, INVOICE sheets)
+              progressBar.style.width = '45%';
+              progressText.textContent = 'Creating output sheets...';
+              
+              // Add worksheets
+              const wsRouteOut = workbook.addWorksheet('ROUTE');
+              const wsSerParts = workbook.addWorksheet('SER-PARTS');
+              const wsTrip   = workbook.addWorksheet('TRIP ID');
+              const wsInv    = workbook.addWorksheet('INVOICE');
+              
+              // Place them before Response sheet in order: ROUTE, SER-PARTS, TRIP ID, INVOICE
+              const sheets = workbook.worksheets;
+              const responseIdx = sheets.findIndex(s => s.name === 'Response');
+              if (responseIdx !== -1) {
+                const addedInv      = sheets.pop();
+                const addedTrip     = sheets.pop();
+                const addedSerParts = sheets.pop();
+                const addedRouteOut = sheets.pop();
+                sheets.splice(responseIdx, 0, addedRouteOut, addedSerParts, addedTrip, addedInv);
+                workbook._worksheets = sheets;
+              }
+              
+              // Set up Column definitions for INVOICE
+              wsInv.columns = [
+                { header: 'PLATFORM', key: 'platform', width: 36.5 },
+                { header: 'DOCKET NO', key: 'docket', width: 43.0 },
+                { header: 'DESC', key: 'desc', width: 110.2 },
+                { header: 'CUST NAME', key: 'custName', width: 117.6 },
+                { header: 'MOB NO', key: 'mob1', width: 32.8 },
+                { header: 'MOB NO', key: 'mob2', width: 32.9 },
+                { header: 'ADDRESS', key: 'address', width: 107.6 },
+                { header: 'CODE', key: 'code', width: 19.9 },
+                { header: 'PAY TYPE', key: 'payType', width: 40.4 },
+                { header: 'INVOICE NO', key: 'invoiceNo', width: 51.6 },
+                { header: 'ROUTE', key: 'route', width: 30.2 }
+              ];
+              
+              // Format Header Row for INVOICE
+              const headerRow = wsInv.getRow(1);
+              headerRow.height = 50;
+              headerRow.eachCell((cell) => {
+                cell.font = { name: 'Calibri', size: 30, bold: true, color: { argb: 'FF000000' } };
+                cell.fill = {
+                  type: 'pattern',
+                  pattern: 'solid',
+                  fgColor: { argb: 'FFE1EBE1' } // ColorIndex 19 corresponding hex is E1EBE1
+                };
+                cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                cell.border = {
+                  top: { style: 'thin', color: { argb: 'FF000000' } },
+                  left: { style: 'thin', color: { argb: 'FF000000' } },
+                  bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                  right: { style: 'thin', color: { argb: 'FF000000' } }
+                };
+              });
+              
+              // Set up Column definitions for SER-PARTS
+              wsSerParts.columns = [
+                { header: 'Platform', key: 'platform', width: 36.1 },
+                { header: 'docket_number', key: 'docket', width: 15.6 },
+                { header: 'item_sku', key: 'sku', width: 39.1 },
+                { header: 'invoice_number', key: 'invoiceNo', width: 17.5 },
+                { header: 'Route', key: 'route', width: 10.9 }
+              ];
+              
+              // Format Header Row of SER-PARTS
+              const serPartsHeader = wsSerParts.getRow(1);
+              serPartsHeader.height = 14.5;
+              serPartsHeader.eachCell((cell) => {
+                cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF000000' } };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                cell.border = {
+                  top: { style: 'thin', color: { argb: 'FF000000' } },
+                  left: { style: 'thin', color: { argb: 'FF000000' } },
+                  bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                  right: { style: 'thin', color: { argb: 'FF000000' } }
+                };
+              });
+
+              // Set up Column definitions for TRIP ID
+              wsTrip.columns = [
+                { header: 'Trip Number', key: 'tripNumber', width: 18.0 },
+                { header: 'Route',       key: 'route',      width: 12.0 },
+                { header: 'cp name',     key: 'cpName',     width: 18.0 },
+                { header: 'vehical no',  key: 'vehicalNo',  width: 14.0 },
+                { header: 'remarks',     key: 'remarks',    width: 22.0 },
+                { header: 'helper id',   key: 'helperId',   width: 48.0 }
+              ];
+
+              // Format Header Row of TRIP ID
+              const tripHeader = wsTrip.getRow(1);
+              tripHeader.height = 14.5;
+              tripHeader.eachCell((cell) => {
+                cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF000000' } };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                cell.border = {
+                  top:    { style: 'thin', color: { argb: 'FF000000' } },
+                  left:   { style: 'thin', color: { argb: 'FF000000' } },
+                  bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                  right:  { style: 'thin', color: { argb: 'FF000000' } }
+                };
+              });
+
+              // Set up Column definitions for ROUTE
+              wsRouteOut.columns = [
+                { header: 'Platform', key: 'platform', width: 36.8 },
+                { header: 'docket_number', key: 'docket', width: 14.4 },
+                { header: 'item_sku', key: 'sku', width: 37.5 },
+                { header: 'invoice_number', key: 'invoiceNo', width: 17.8 },
+                { header: 'Route', key: 'route', width: 12.9 },
+                { header: 'Type', key: 'type', width: 8.5 },
+                { header: 'Remarks', key: 'remarks', width: 25.9 },
+                { header: 'Bags', key: 'bags', width: 8.5 },
+                { header: 'Roll', key: 'roll', width: 8.5 },
+                { header: 'Trip Id', key: 'tripId', width: 11.2 }
+              ];
+              
+              // Format Header Row of ROUTE
+              const routeHeader = wsRouteOut.getRow(1);
+              routeHeader.height = 14.5;
+              routeHeader.eachCell((cell) => {
+                cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF000000' } };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                cell.border = {
+                  top: { style: 'thin', color: { argb: 'FF000000' } },
+                  left: { style: 'thin', color: { argb: 'FF000000' } },
+                  bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                  right: { style: 'thin', color: { argb: 'FF000000' } }
+                };
+              });
+
+              progressBar.style.width = '65%';
+              progressText.textContent = 'Generating data rows...';
+              
+              // Load Route Plan sheet (find sheet that starts with "Route plan")
+              const wsRoute = workbook.worksheets.find(s => s.name.startsWith('Route plan'));
+              if (!wsRoute) {
+                throw new Error("Could not find 'Route plan' sheet in the uploaded file.");
+              }
+              
+              const routeRowsCount = wsRoute.rowCount;
+              let invoiceCount = 0;
+              let serPartsCount = 0;
+              let routeCount = 0;
+              
+              // Scan header row (Row 1) of Route Plan sheet to find column indices
+              const headers = {};
+              const routeHeaderRow = wsRoute.getRow(1);
+              routeHeaderRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                const rawText = (cell.value || '').toString().trim().toLowerCase();
+                const normalized = rawText.replace(/\s+/g, '_').replace(/_+/g, '_');
+                if (normalized && !headers[normalized]) {
+                  headers[normalized] = colNumber;
+                }
+              });
+
+              // Resolve column indices dynamically (with fallback to original static defaults)
+              const platformCol   = headers['platform'] || 1;
+              const docketCol     = headers['docket_number'] || headers['docket_no'] || 19;
+              const descCol       = headers['item_sku'] || headers['desc'] || 7;
+              const cxNameCol     = headers['cx_name'] || headers['cust_name'] || 3;
+              const mob1Col       = headers['mobile_number'] || headers['mob_no'] || 8;
+              const mob2Col       = headers['alternate_mobile_number'] || headers['alt_mob_no'] || 9;
+              const addressCol    = headers['address'] || 4;
+              const codeCol       = headers['pincode'] || headers['pin_code'] || headers['code'] || 5;
+              const payTypeCol    = headers['payment_type'] || headers['pay_type'] || 17;
+              const invoiceNoCol  = headers['invoice_number'] || headers['invoice_no'] || 18;
+              const routeCol      = headers['route'] || 6;
+              const typeCol       = headers['storage_location'] || headers['type'] || 15;
+              const orderTypeCol  = headers['order_type'] || 21;
+
+              // Pre-pass to count duplicate customer names and addresses and resolve Route → Trip ID mappings
+              const nameCounts = {};
+              const addrCounts = {};
+              const routeTripMap = {};
+              for (let r = 2; r <= routeRowsCount; r++) {
+                const routeRow = wsRoute.getRow(r);
+                const routeVal = (routeRow.getCell(routeCol).value || '').toString().trim();
+                if (routeVal === "" || routeVal === "Not planned") continue;
+                
+                const cxName = (routeRow.getCell(cxNameCol).value || '').toString().trim().toLowerCase();
+                const address = (routeRow.getCell(addressCol).value || '').toString().trim().toLowerCase();
+                if (cxName) {
+                  nameCounts[cxName] = (nameCounts[cxName] || 0) + 1;
+                }
+                if (address) {
+                  addrCounts[address] = (addrCounts[address] || 0) + 1;
+                }
+
+                // Map Route to Trip Number if docket is in tripIdMap
+                const docketVal = (routeRow.getCell(docketCol).value || '').toString().trim().toUpperCase();
+                if (tripIdMap[docketVal]) {
+                  routeTripMap[routeVal] = tripIdMap[docketVal];
+                }
+              }
+
+              // Ensure all routes exist in the map
+              for (let r = 2; r <= routeRowsCount; r++) {
+                const routeRow = wsRoute.getRow(r);
+                const routeVal = (routeRow.getCell(routeCol).value || '').toString().trim();
+                if (routeVal === "" || routeVal === "Not planned") continue;
+                if (routeTripMap[routeVal] === undefined) {
+                  routeTripMap[routeVal] = '';
+                }
+              }
+              
+              for (let r = 2; r <= routeRowsCount; r++) {
+                const routeRow = wsRoute.getRow(r);
+                const routeVal = (routeRow.getCell(routeCol).value || '').toString().trim();
+                
+                // Skip if route is empty or "Not planned"
+                if (routeVal === "" || routeVal === "Not planned") {
+                  continue;
+                }
+                
+                const platform        = (routeRow.getCell(platformCol).value || '').toString();
+                const docket          = (routeRow.getCell(docketCol).value || '').toString().trim();
+                const desc            = (routeRow.getCell(descCol).value || '').toString();
+                const cxName          = (routeRow.getCell(cxNameCol).value || '').toString();
+                const mob1            = (routeRow.getCell(mob1Col).value || '').toString();
+                const mob2            = (routeRow.getCell(mob2Col).value || '').toString();
+                const address         = (routeRow.getCell(addressCol).value || '').toString();
+                const code            = (routeRow.getCell(codeCol).value || '').toString();
+                const payType         = (routeRow.getCell(payTypeCol).value || '').toString();
+                const invoiceNo       = (routeRow.getCell(invoiceNoCol).value || '').toString();
+                let storageLocation = (routeRow.getCell(typeCol).value || '').toString().trim();
+                const orderTypeVal  = (routeRow.getCell(orderTypeCol).value || '').toString().trim();
+                
+                const nameKey = cxName.trim().toLowerCase();
+                const addrKey = address.trim().toLowerCase();
+                const isDuplicate = (nameKey && nameCounts[nameKey] > 1) || (addrKey && addrCounts[addrKey] > 1);
+                
+                // Helper to check if it's a service part or service route
+                const isService = (() => {
+                  const plat = (platform || '').toLowerCase().trim();
+                  const stdPlats = ['wakefit', 'wakefit_retail', 'amazon', 'flipkart', 'offline'];
+                  return (!stdPlats.includes(plat) && plat !== '') || routeVal.toLowerCase().includes('ser');
+                })();
+                
+                const rtpSkus = ["WSTEDWIN", "WMCFTKALTOSSW", "WEWB7872HYSTESSERCW", "WEWB7860STESSERCW", "WEWB7860HYSTESSERCW", "WCFTCLYRACW"];
+                const isRtpSku = rtpSkus.includes(desc.trim());
+                const isReplacement = orderTypeVal === "Replacement";
+                
+                if (!isService && (isReplacement || isRtpSku)) {
+                  storageLocation = "RTP1";
+                }
+                
+                // Copy highlight color from source platform cell
+                let targetFill = null;
+                const sourcePlatCell = routeRow.getCell(platformCol);
+                if (sourcePlatCell.fill && sourcePlatCell.fill.type === 'pattern' && sourcePlatCell.fill.fgColor) {
+                  targetFill = JSON.parse(JSON.stringify(sourcePlatCell.fill));
+                }
+                
+                const finalTypeVal = isService ? "SER" : storageLocation;
+
+                // Get the resolved Trip Id for this route
+                const tripId = routeTripMap[routeVal] || '';
+
+                // 1. Populate ROUTE sheet
+                const newRouteRow = wsRouteOut.addRow([
+                  platform, docket, desc, invoiceNo, routeVal, finalTypeVal, '', '', '', tripId
+                ]);
+                newRouteRow.height = 14.5;
+                routeCount++;
+                
+                const isSerType = finalTypeVal.toUpperCase() === 'SER';
+                const isRtpType = finalTypeVal.toUpperCase().startsWith('RTP');
+                
+                newRouteRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                  cell.font = { name: 'Calibri', size: 11, bold: (colNumber <= 6 && isRtpType), color: { argb: 'FF000000' } };
+                  cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                  cell.border = {
+                    top: { style: 'thin', color: { argb: 'FF000000' } },
+                    left: { style: 'thin', color: { argb: 'FF000000' } },
+                    bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                    right: { style: 'thin', color: { argb: 'FF000000' } }
+                  };
+                  
+                  if (colNumber <= 5) {
+                    if (isSerType) {
+                      cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FF00B0F0' } // Sky Blue
+                      };
+                    } else if (isReplacement) {
+                      cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FF92D050' } // Light Green
+                      };
+                    } else if (targetFill) {
+                      cell.fill = targetFill;
+                    }
+                  }
+                });
+                
+                // 2. Populate SER-PARTS if it's a service order
+                if (isService) {
+                  const newSerRow = wsSerParts.addRow([
+                    platform, docket, desc, invoiceNo, routeVal
+                  ]);
+                  newSerRow.height = 14.5;
+                  serPartsCount++;
+                  newSerRow.eachCell((cell) => {
+                    cell.font = { name: 'Calibri', size: 11, bold: false, color: { argb: 'FF000000' } };
+                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                    cell.border = {
+                      top: { style: 'thin', color: { argb: 'FF000000' } },
+                      left: { style: 'thin', color: { argb: 'FF000000' } },
+                      bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                      right: { style: 'thin', color: { argb: 'FF000000' } }
+                    };
+                  });
+                }
+
+                // 3. Always populate INVOICE
+                const newInvRow = wsInv.addRow([
+                  platform, docket, desc, cxName, mob1, mob2, address, code, payType, invoiceNo, routeVal
+                ]);
+                newInvRow.height = 219;
+                invoiceCount++;
+                
+                newInvRow.eachCell((cell, colNumber) => {
+                  cell.font = { name: 'Calibri', size: 30, bold: true, color: { argb: 'FF000000' } };
+                  cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                  cell.border = {
+                    top: { style: 'thin', color: { argb: 'FF000000' } },
+                    left: { style: 'thin', color: { argb: 'FF000000' } },
+                    bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                    right: { style: 'thin', color: { argb: 'FF000000' } }
+                  };
+                  
+                  if (isService) {
+                    cell.fill = {
+                      type: 'pattern',
+                      pattern: 'solid',
+                      fgColor: { argb: 'FF00B0F0' } // Sky Blue
+                    };
+                  } else {
+                    if (colNumber === 7 && isDuplicate) {
+                      cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FFFADBD8' } // Soft pastel pink
+                      };
+                    } else if (targetFill) {
+                      cell.fill = targetFill;
+                    } else {
+                      cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FFFFFFFF' } // White
+                      };
+                    }
+                  }
+                });
+              }
+              
+              // Populate TRIP ID sheet — one row per unique route, sorted numerically then alphabetically
+              const routeEntries = Object.entries(routeTripMap).sort((a, b) => {
+                const na = parseFloat(a[0]), nb = parseFloat(b[0]);
+                if (!isNaN(na) && !isNaN(nb)) return na - nb;
+                if (!isNaN(na)) return -1;
+                if (!isNaN(nb)) return 1;
+                return a[0].localeCompare(b[0]);
+              });
+              for (const [route, tripNum] of routeEntries) {
+                const newTripRow = wsTrip.addRow([tripNum, route, '', '', '', '']);
+                newTripRow.height = 14.5;
+                newTripRow.eachCell({ includeEmpty: true }, (cell) => {
+                  cell.font = { name: 'Calibri', size: 11, color: { argb: 'FF000000' } };
+                  cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                  cell.border = {
+                    top:    { style: 'thin', color: { argb: 'FF000000' } },
+                    left:   { style: 'thin', color: { argb: 'FF000000' } },
+                    bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                    right:  { style: 'thin', color: { argb: 'FF000000' } }
+                  };
+                });
+              }
+
+              // Ensure gridlines are visible
+              wsInv.views      = [{ showGridLines: true }];
+              wsSerParts.views = [{ showGridLines: true }];
+              wsTrip.views     = [{ showGridLines: true }];
+              wsRouteOut.views = [{ showGridLines: true }];
+              
+              progressBar.style.width = '85%';
+              progressText.textContent = 'Formatting and packaging...';
+              
+              const buffer = await workbook.xlsx.writeBuffer();
+              triggerDownload(buffer, 'data 1.xlsx');
+              
+              progressBar.style.width = '100%';
+              progressContainer.style.display = 'none';
+              showMessage(`Successfully generated sheets (INVOICE: ${invoiceCount} rows, SER-PARTS: ${serPartsCount} rows, ROUTE: ${routeCount} rows) and downloaded data 1.xlsx!`, 'success');
+            }
+          } catch (err) {
+            console.error(err);
+            progressContainer.style.display = 'none';
+            actionPanel.style.display = 'flex';
+            showMessage('Error during processing: ' + err.message, 'error');
+          }
+        };
+        reader.readAsArrayBuffer(currentFile);
+      } catch (err) {
+        progressContainer.style.display = 'none';
+        actionPanel.style.display = 'flex';
+        showMessage('Error reading file: ' + err.message, 'error');
+      }
+    });
+
+    function triggerDownload(buffer, fileName) {
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  </script>
+</body>
+</html>
