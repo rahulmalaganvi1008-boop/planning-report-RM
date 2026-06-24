@@ -307,6 +307,47 @@
       color: #f87171;
     }
 
+    .segment-control {
+      display: flex;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 0.25rem;
+      width: 100%;
+      gap: 0.25rem;
+      margin-top: 0.25rem;
+    }
+
+    .segment-option {
+      flex: 1;
+      cursor: pointer;
+      text-align: center;
+      position: relative;
+    }
+
+    .segment-option input {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .segment-option span {
+      display: block;
+      padding: 0.75rem 0.5rem;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--text-sub);
+      transition: all 0.2s ease;
+    }
+
+    .segment-option input:checked + span {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2);
+    }
+
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
@@ -345,9 +386,18 @@
         <span class="info-label">Detected Format:</span>
         <span class="badge" id="fileBadge">data 2 (no Invoice)</span>
       </div>
-      <div class="info-row">
-        <span class="info-label">Conversion Target:</span>
-        <span class="info-val" id="conversionTarget" style="color: var(--accent); font-weight: 600;">data 1.xlsx (add Invoice)</span>
+      <div class="info-row" style="flex-direction: column; align-items: flex-start; gap: 0.5rem; width: 100%;">
+        <span class="info-label">Action Target:</span>
+        <div class="segment-control">
+          <label class="segment-option">
+            <input type="radio" name="conversionMode" id="modeAdd" value="add" checked>
+            <span>Add / Update Execution Sheets (data 1.xlsx)</span>
+          </label>
+          <label class="segment-option">
+            <input type="radio" name="conversionMode" id="modeRemove" value="remove">
+            <span>Remove Execution Sheets (data 2.xlsx)</span>
+          </label>
+        </div>
       </div>
     </div>
 
@@ -385,7 +435,6 @@
     const fileNameEl   = document.getElementById('fileName');
     const fileSizeEl   = document.getElementById('fileSize');
     const fileBadge    = document.getElementById('fileBadge');
-    const conversionTargetEl = document.getElementById('conversionTarget');
     const actionPanel  = document.getElementById('actionPanel');
     const convertBtn   = document.getElementById('convertBtn');
     const progressContainer = document.getElementById('progressContainer');
@@ -513,12 +562,11 @@
             if (isData1) {
               fileBadge.className = 'badge badge-data1';
               fileBadge.textContent = 'data 1 (contains Invoice)';
-              conversionTargetEl.textContent = 'data 2.xlsx (removes Invoice)';
             } else {
               fileBadge.className = 'badge badge-data2';
               fileBadge.textContent = 'data 2 (no Invoice)';
-              conversionTargetEl.textContent = 'data 1.xlsx (adds Invoice)';
             }
+            document.getElementById('modeAdd').checked = true;
             
             fileDetails.style.display = 'flex';
             actionPanel.style.display = 'flex';
@@ -554,7 +602,9 @@
             const workbook = new ExcelJS.Workbook();
             await workbook.xlsx.load(arrayBuffer);
             
-            if (isData1) {
+            const selectedMode = document.querySelector('input[name="conversionMode"]:checked').value;
+            
+            if (selectedMode === 'remove') {
               // Convert data 1 -> data 2 (Remove INVOICE, SER-PARTS, ROUTE sheets)
               progressBar.style.width = '60%';
               progressText.textContent = 'Removing generated sheets...';
@@ -575,10 +625,20 @@
               showMessage('Successfully removed generated sheets and created data 2.xlsx!', 'success');
               
             } else {
-              // Convert data 2 -> data 1 (Add ROUTE, SER-PARTS, INVOICE sheets)
+              // Convert data 2 -> data 1 (Add/Update ROUTE, SER-PARTS, TRIP ID, INVOICE sheets)
               progressBar.style.width = '45%';
-              progressText.textContent = 'Creating output sheets...';
+              progressText.textContent = 'Creating/Updating output sheets...';
               
+              // Check if sheets already exist and remove them to start fresh
+              const existingRoute = workbook.getWorksheet('ROUTE');
+              if (existingRoute) workbook.removeWorksheet('ROUTE');
+              const existingSerParts = workbook.getWorksheet('SER-PARTS');
+              if (existingSerParts) workbook.removeWorksheet('SER-PARTS');
+              const existingTrip = workbook.getWorksheet('TRIP ID');
+              if (existingTrip) workbook.removeWorksheet('TRIP ID');
+              const existingInv = workbook.getWorksheet('INVOICE');
+              if (existingInv) workbook.removeWorksheet('INVOICE');
+
               // Add worksheets
               const wsRouteOut = workbook.addWorksheet('ROUTE');
               const wsSerParts = workbook.addWorksheet('SER-PARTS');
