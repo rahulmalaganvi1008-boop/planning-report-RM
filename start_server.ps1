@@ -2,7 +2,7 @@ $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://localhost:8080/")
 try {
     $listener.Start()
-    Write-Host "Web server started! Listening on http://localhost:8080/converter.html"
+    Write-Host "Web server started! Listening on http://localhost:8080/index.html"
 } catch {
     Write-Host "Failed to start server: $_"
     exit 1
@@ -18,7 +18,7 @@ while ($listener.IsListening) {
         
         $urlPath = $req.Url.LocalPath
         if ($urlPath -eq "/" -or $urlPath -eq "") {
-            $urlPath = "/converter.html"
+            $urlPath = "/index.html"
         }
         
         $filePath = Join-Path $workspaceDir $urlPath.TrimStart('/')
