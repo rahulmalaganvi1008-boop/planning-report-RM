@@ -272,6 +272,64 @@ try {
             Write-Host "No Trip ID mapping file found. Trip ID fields will be left blank."
         }
 
+        # Search for picklist mapping file dynamically in workspace, Downloads, Documents, or Desktop
+        $picklistPaths = @(
+            $workspaceDir,
+            "C:\Users\rahul.malaganvi\Downloads",
+            "C:\Users\rahul.malaganvi\Documents",
+            "C:\Users\rahul.malaganvi\Desktop"
+        )
+        $picklistMapPath = $null
+        $latestPickTime = [DateTime]::MinValue
+        foreach ($folder in $picklistPaths) {
+            if (Test-Path $folder) {
+                Get-ChildItem -Path $folder -Filter "picklist*.xlsx" -ErrorAction SilentlyContinue | ForEach-Object {
+                    if ($_.LastWriteTime -gt $latestPickTime) {
+                        $latestPickTime = $_.LastWriteTime
+                        $picklistMapPath = $_.FullName
+                    }
+                }
+            }
+        }
+
+        $picklistMap = @{}
+        if ($null -ne $picklistMapPath) {
+            Write-Host "Found Picklist file at: $picklistMapPath"
+            Write-Host "Loading Picklist mappings..."
+            $wbPick = $excel.Workbooks.Open($picklistMapPath)
+            $wsPickSrc = $wbPick.Sheets.Item(1)
+            $pickRows = $wsPickSrc.UsedRange.Rows.Count
+            $pickCols = $wsPickSrc.UsedRange.Columns.Count
+
+            # Resolve columns dynamically
+            $docketColIdx = -1
+            $areaColIdx = -1
+            for ($c = 1; $c -le $pickCols; $c++) {
+                $val = $wsPickSrc.Cells(1, $c).Text.Trim().ToLower()
+                if ($val -like "*docket*" -or $val -like "*consignment*" -or $val -like "*awb*") {
+                    $docketColIdx = $c
+                }
+                if ($val -eq "area" -or $val -eq "type" -or $val -like "*slock*" -or $val -like "*storage_location*") {
+                    $areaColIdx = $c
+                }
+            }
+
+            if ($docketColIdx -eq -1) { $docketColIdx = 2 }
+            if ($areaColIdx -eq -1) { $areaColIdx = 6 }
+
+            for ($pr = 2; $pr -le $pickRows; $pr++) {
+                $docketVal = $wsPickSrc.Cells($pr, $docketColIdx).Text.Trim().ToUpper()
+                $areaVal = $wsPickSrc.Cells($pr, $areaColIdx).Text.Trim()
+                if ($docketVal -ne "" -and $areaVal -ne "") {
+                    $picklistMap[$docketVal] = $areaVal
+                }
+            }
+            $wbPick.Close($false)
+            Write-Host "Successfully loaded $($picklistMap.Count) Picklist mappings."
+        } else {
+            Write-Host "No Picklist file found."
+        }
+
         # Pre-pass to count duplicate customer names and addresses and resolve Route → Trip ID mappings
         $nameCounts   = @{}
         $addrCounts   = @{}
@@ -346,13 +404,19 @@ try {
             $isServiceRoute = ($routeVal -like "*Ser*" -or $routeVal -like "*Service*")
             $isService = ($isServicePart -or $isServiceRoute)
             
-            $isRtpSku = ($desc.Trim() -in @("WSTEDWIN", "WMCFTKALTOSSW", "WEWB7872HYSTESSERCW", "WEWB7860STESSERCW", "WEWB7860HYSTESSERCW", "WCFTCLYRACW"))
             $isReplacement = ($orderTypeVal -eq "Replacement")
             
             if ($isService) {
                 $typeVal = "SER"
-            } elseif ($isReplacement -or $isRtpSku) {
-                $typeVal = "RTP1"
+            } else {
+                $docketKey = $docket.Trim().ToUpper()
+                if ($picklistMap.Count -gt 0 -and $picklistMap.ContainsKey($docketKey)) {
+                    $typeVal = $picklistMap[$docketKey]
+                } else {
+                    if ($typeVal -eq "") {
+                        $typeVal = "FG01"
+                    }
+                }
             }
 
             # Copy background color from source platform cell

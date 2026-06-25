@@ -357,13 +357,14 @@
 <body>
   <div class="container">
     <header>
-      <h1>Wakefit Logistics Converter</h1>
+      <h1>Wakefit Logistics Converter v1.1</h1>
       <p class="subtitle">Drag & drop excel files to sync & format sheets instantly</p>
     </header>
 
     <!-- Invisible file inputs -->
     <input type="file" id="fileInput" accept=".xlsx" style="display: none;">
     <input type="file" id="tripFileInput" accept=".xlsx" style="display: none;">
+    <input type="file" id="picklistFileInput" accept=".xlsx" style="display: none;">
 
     <!-- Step 1: Route Planning File -->
     <div class="trip-section-label">Step 1 — Route Planning File</div>
@@ -413,6 +414,18 @@
       <span id="tripStatusText">Trip ID file loaded — 0 entries mapped</span>
     </div>
 
+    <!-- Step 3: Picklist File (optional) -->
+    <div class="trip-section-label">Step 3 — Picklist File <span style="font-weight:400; color:var(--text-sub); text-transform:none; letter-spacing:0;">(optional — matches FG01/RTP1 Type)</span></div>
+    <div class="drop-zone-trip" id="picklistDropZone" style="border-color: rgba(16, 185, 129, 0.35); background: rgba(16, 185, 129, 0.04);">
+      <div class="drop-icon" style="font-size:2rem; color: var(--primary);">📋</div>
+      <div class="drop-text-sm" id="picklistDropText">Upload Picklist file here</div>
+      <div class="drop-subtext">File must have: docket_number and area columns</div>
+    </div>
+    <div class="trip-status" id="picklistStatus" style="color: var(--primary); background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.2);">
+      <span>✅</span>
+      <span id="picklistStatusText">Picklist file loaded — 0 entries mapped</span>
+    </div>
+
     <div class="progress-container" id="progressContainer">
       <div class="progress-bar-bg">
         <div class="progress-bar" id="progressBar"></div>
@@ -449,10 +462,18 @@
     const tripStatus     = document.getElementById('tripStatus');
     const tripStatusText = document.getElementById('tripStatusText');
 
+    // Picklist upload elements
+    const picklistDropZone   = document.getElementById('picklistDropZone');
+    const picklistFileInput  = document.getElementById('picklistFileInput');
+    const picklistDropText   = document.getElementById('picklistDropText');
+    const picklistStatus     = document.getElementById('picklistStatus');
+    const picklistStatusText = document.getElementById('picklistStatusText');
+
     let currentFile = null;
     let isData1 = false;
     // Lookup map: consignmentNumber (UPPERCASE) -> tripNumber
     let tripIdMap = {};
+    let picklistMap = {};
 
     // ── Route Planning file drag & drop ──────────────────────────
     dropZone.addEventListener('click', () => fileInput.click());
@@ -476,6 +497,18 @@
     tripDropZone.addEventListener('drop', (e) => {
       e.preventDefault(); tripDropZone.classList.remove('dragover');
       if (e.dataTransfer.files.length > 0) handleTripFileSelect(e.dataTransfer.files[0]);
+    });
+
+    // ── Picklist file drag & drop ──────────────────────────────────
+    picklistDropZone.addEventListener('click', () => picklistFileInput.click());
+    picklistFileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) handlePicklistFileSelect(e.target.files[0]);
+    });
+    picklistDropZone.addEventListener('dragover', (e) => { e.preventDefault(); picklistDropZone.classList.add('dragover'); });
+    picklistDropZone.addEventListener('dragleave', () => picklistDropZone.classList.remove('dragover'));
+    picklistDropZone.addEventListener('drop', (e) => {
+      e.preventDefault(); picklistDropZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length > 0) handlePicklistFileSelect(e.dataTransfer.files[0]);
     });
 
     // ── Parse Trip ID Excel file ──────────────────────────────────
@@ -511,6 +544,64 @@
           } catch (err) {
             console.error(err);
             alert('Error reading Trip ID file: ' + err.message);
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
+
+    // ── Parse Picklist Excel file ──────────────────────────────────
+    async function handlePicklistFileSelect(file) {
+      try {
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+          try {
+            const arrayBuffer = e.target.result;
+            const wb = new ExcelJS.Workbook();
+            await wb.xlsx.load(arrayBuffer);
+
+            // Use the first worksheet
+            const ws = wb.worksheets[0];
+            const newMap = {};
+            let count = 0;
+
+            // Resolve columns
+            let docketColIdx = -1;
+            let areaColIdx = -1;
+            const firstRow = ws.getRow(1);
+            firstRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+              const val = (cell.value || '').toString().trim().toLowerCase();
+              if (val.includes('docket') || val.includes('consignment') || val.includes('awb')) {
+                docketColIdx = colNumber;
+              }
+              if (val === 'area' || val === 'type' || val.includes('slock') || val.includes('storage_location')) {
+                areaColIdx = colNumber;
+              }
+            });
+
+            if (docketColIdx === -1) docketColIdx = 2; // Default Col B
+            if (areaColIdx === -1) areaColIdx = 6;     // Default Col F
+
+            ws.eachRow((row, rowNumber) => {
+              if (rowNumber === 1) return; // skip header
+              const docket = (row.getCell(docketColIdx).value || '').toString().trim().toUpperCase();
+              const area = (row.getCell(areaColIdx).value || '').toString().trim();
+              if (docket && area) {
+                newMap[docket] = area;
+                count++;
+              }
+            });
+
+            picklistMap = newMap;
+            picklistDropText.textContent = file.name;
+            picklistStatusText.textContent = `Picklist file loaded — ${count} entries mapped`;
+            picklistStatus.classList.add('visible');
+            picklistDropZone.style.borderColor = 'var(--primary)';
+          } catch (err) {
+            console.error(err);
+            alert('Error reading Picklist file: ' + err.message);
           }
         };
         reader.readAsArrayBuffer(file);
@@ -895,13 +986,7 @@
                   return (!stdPlats.includes(plat) && plat !== '') || routeVal.toLowerCase().includes('ser');
                 })();
                 
-                const rtpSkus = ["WSTEDWIN", "WMCFTKALTOSSW", "WEWB7872HYSTESSERCW", "WEWB7860STESSERCW", "WEWB7860HYSTESSERCW", "WCFTCLYRACW"];
-                const isRtpSku = rtpSkus.includes(desc.trim());
                 const isReplacement = orderTypeVal === "Replacement";
-                
-                if (!isService && (isReplacement || isRtpSku)) {
-                  storageLocation = "RTP1";
-                }
                 
                 // Copy highlight color from source platform cell
                 let targetFill = null;
@@ -910,7 +995,17 @@
                   targetFill = JSON.parse(JSON.stringify(sourcePlatCell.fill));
                 }
                 
-                const finalTypeVal = isService ? "SER" : storageLocation;
+                let finalTypeVal = storageLocation;
+                if (isService) {
+                  finalTypeVal = "SER";
+                } else {
+                  const docketKey = docket.trim().toUpperCase();
+                  if (Object.keys(picklistMap).length > 0 && picklistMap[docketKey]) {
+                    finalTypeVal = picklistMap[docketKey];
+                  } else {
+                    finalTypeVal = storageLocation || "FG01";
+                  }
+                }
 
                 // Get the resolved Trip Id for this route
                 const tripId = routeTripMap[routeVal] || '';
