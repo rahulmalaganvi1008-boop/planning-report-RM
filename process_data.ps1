@@ -235,20 +235,48 @@ try {
         $typeCol = if ($headers.ContainsKey("storage_location")) { $headers["storage_location"] } elseif ($headers.ContainsKey("type")) { $headers["type"] } else { 15 }
         $orderTypeCol = if ($headers.ContainsKey("order_type")) { $headers["order_type"] } else { 21 }
 
-        # Search for trip mapping file dynamically in workspace, parent, or Documents folder
-        $tripFilePaths = @(
-            (Join-Path $workspaceDir "new trip id.xlsx"),
-            (Join-Path $workspaceDir "trip id.xlsx"),
-            (Join-Path (Split-Path $workspaceDir -Parent) "new trip id.xlsx"),
-            (Join-Path (Split-Path $workspaceDir -Parent) "trip id.xlsx"),
-            "C:\Users\rahul.malaganvi\Documents\new trip id.xlsx",
-            "C:\Users\rahul.malaganvi\Documents\trip id.xlsx"
+        # Search for trip mapping file (newly added order doc or fallback to old trip id file)
+        $orderPaths = @(
+            $workspaceDir,
+            "C:\Users\rahul.malaganvi\Downloads",
+            "C:\Users\rahul.malaganvi\Documents",
+            "C:\Users\rahul.malaganvi\Desktop"
         )
         $tripMapPath = $null
-        foreach ($p in $tripFilePaths) {
-            if (Test-Path $p) {
-                $tripMapPath = $p
-                break
+        $latestTime = [DateTime]::MinValue
+        $isCsv = $false
+        
+        # 1. Search for Order*.csv or Order*.xlsx (the new order doc)
+        foreach ($folder in $orderPaths) {
+            if (Test-Path $folder) {
+                Get-ChildItem -Path $folder -Filter "Order*" -ErrorAction SilentlyContinue | ForEach-Object {
+                    if ($_.Name -like "*.csv" -or $_.Name -like "*.xlsx") {
+                        if ($_.LastWriteTime -gt $latestTime) {
+                            $latestTime = $_.LastWriteTime
+                            $tripMapPath = $_.FullName
+                            $isCsv = ($_.Name -like "*.csv")
+                        }
+                    }
+                }
+            }
+        }
+
+        # 2. Fall back to old trip mapping files if no Order* file found
+        if ($null -eq $tripMapPath) {
+            $oldTripPaths = @(
+                (Join-Path $workspaceDir "new trip id.xlsx"),
+                (Join-Path $workspaceDir "trip id.xlsx"),
+                (Join-Path (Split-Path $workspaceDir -Parent) "new trip id.xlsx"),
+                (Join-Path (Split-Path $workspaceDir -Parent) "trip id.xlsx"),
+                "C:\Users\rahul.malaganvi\Documents\new trip id.xlsx",
+                "C:\Users\rahul.malaganvi\Documents\trip id.xlsx"
+            )
+            foreach ($p in $oldTripPaths) {
+                if (Test-Path $p) {
+                    $tripMapPath = $p
+                    $isCsv = $false
+                    break
+                }
             }
         }
 
@@ -256,17 +284,71 @@ try {
         if ($null -ne $tripMapPath) {
             Write-Host "Found Trip ID mapping file at: $tripMapPath"
             Write-Host "Loading Trip ID mappings..."
-            $wbTrip = $excel.Workbooks.Open($tripMapPath)
-            $wsTripSrc = $wbTrip.Sheets.Item(1)
-            $tripRows = $wsTripSrc.UsedRange.Rows.Count
-            for ($tr = 2; $tr -le $tripRows; $tr++) {
-                $tripNum = $wsTripSrc.Cells($tr, 1).Text.Trim()
-                $consNum = $wsTripSrc.Cells($tr, 2).Text.Trim().ToUpper()
-                if ($tripNum -ne "" -and $consNum -ne "") {
-                    $tripIdMap[$consNum] = $tripNum
+            if ($isCsv) {
+                try {
+                    $csv = Import-Csv -Path $tripMapPath
+                    $tripNumHeader = $null
+                    $consNumHeader = $null
+                    if ($csv.Count -gt 0) {
+                        $firstRow = $csv[0]
+                        foreach ($prop in $firstRow.PSObject.Properties) {
+                            $name = $prop.Name.Trim().ToLower()
+                            if ($name -eq "trip number" -or $name -eq "trip_number") {
+                                $tripNumHeader = $prop.Name
+                            }
+                            if ($name -eq "consignment number" -or $name -eq "consignment_number" -or $name -eq "consignment no" -or $name -eq "docket no") {
+                                $consNumHeader = $prop.Name
+                            }
+                        }
+                    }
+                    if ($null -eq $tripNumHeader) { $tripNumHeader = "Trip Number" }
+                    if ($null -eq $consNumHeader) { $consNumHeader = "Consignment Number" }
+
+                    foreach ($row in $csv) {
+                        $tripNum = $row.$tripNumHeader
+                        $consNum = $row.$consNumHeader
+                        if ($null -ne $tripNum -and $null -ne $consNum) {
+                            $t = $tripNum.ToString().Trim()
+                            $c = $consNum.ToString().Trim().ToUpper()
+                            if ($t -ne "" -and $c -ne "") {
+                                $tripIdMap[$c] = $t
+                            }
+                        }
+                    }
+                } catch {
+                    Write-Host "Error loading CSV with Import-Csv, attempting Excel open..."
+                    $isCsv = $false
                 }
             }
-            $wbTrip.Close($false)
+
+            if (-not $isCsv) {
+                $wbTrip = $excel.Workbooks.Open($tripMapPath)
+                $wsTripSrc = $wbTrip.Sheets.Item(1)
+                $tripRows = $wsTripSrc.UsedRange.Rows.Count
+                $tripCols = $wsTripSrc.UsedRange.Columns.Count
+                
+                # Resolve columns dynamically
+                $tripColIdx = 1
+                $consColIdx = 2
+                for ($c = 1; $c -le $tripCols; $c++) {
+                    $val = $wsTripSrc.Cells(1, $c).Text.Trim().ToLower()
+                    if ($val -eq "trip number" -or $val -eq "trip_number" -or $val -eq "trip no") {
+                        $tripColIdx = $c
+                    }
+                    if ($val -eq "consignment number" -or $val -eq "consignment_number" -or $val -eq "consignment no" -or $val -eq "docket no" -or $val -eq "docket_number") {
+                        $consColIdx = $c
+                    }
+                }
+                
+                for ($tr = 2; $tr -le $tripRows; $tr++) {
+                    $tripNum = $wsTripSrc.Cells($tr, $tripColIdx).Text.Trim()
+                    $consNum = $wsTripSrc.Cells($tr, $consColIdx).Text.Trim().ToUpper()
+                    if ($tripNum -ne "" -and $consNum -ne "") {
+                        $tripIdMap[$consNum] = $tripNum
+                    }
+                }
+                $wbTrip.Close($false)
+            }
             Write-Host "Successfully loaded $($tripIdMap.Count) Trip ID mappings."
         } else {
             Write-Host "No Trip ID mapping file found. Trip ID fields will be left blank."
@@ -330,10 +412,60 @@ try {
             Write-Host "No Picklist file found."
         }
 
+        # Load Service sheet data if it exists to help classify service dockets and populate SER-PARTS later
+        $serviceSheetRows = @{}
+        $wsServiceSrc = $null
+        $sRows = 0
+        try {
+            $wsServiceSrc = $wb.Sheets.Item("Service")
+        } catch {}
+        
+        if ($null -ne $wsServiceSrc) {
+            Write-Host "Found Service sheet. Building service dockets mapping..."
+            $sRows = $wsServiceSrc.UsedRange.Rows.Count
+            $sCols = $wsServiceSrc.UsedRange.Columns.Count
+            
+            # Find column indices dynamically for Service sheet
+            $sHeaders = @{}
+            for ($c = 1; $c -le $sCols; $c++) {
+                $rawVal = $wsServiceSrc.Cells(1, $c).Text
+                if ($rawVal) {
+                    $norm = $rawVal.Trim().ToLower() -replace '\s+', '_' -replace '_+', '_'
+                    if ($norm -ne "" -and -not $sHeaders.ContainsKey($norm)) {
+                        $sHeaders[$norm] = $c
+                    }
+                }
+            }
+            
+            $sTypeColIdx = if ($sHeaders.ContainsKey("type")) { $sHeaders["type"] } elseif ($sHeaders.ContainsKey("ty")) { $sHeaders["ty"] } else { 1 }
+            $sDocketColIdx = if ($sHeaders.ContainsKey("docket_number")) { $sHeaders["docket_number"] } elseif ($sHeaders.ContainsKey("docket_no")) { $sHeaders["docket_no"] } else { 6 }
+            $sSkuColIdx = if ($sHeaders.ContainsKey("item_sku")) { $sHeaders["item_sku"] } else { 4 }
+            $sInvoiceColIdx = if ($sHeaders.ContainsKey("invoice_number")) { $sHeaders["invoice_number"] } elseif ($sHeaders.ContainsKey("invoice_no")) { $sHeaders["invoice_no"] } else { 5 }
+            
+            for ($sr = 2; $sr -le $sRows; $sr++) {
+                $docketVal = $wsServiceSrc.Cells($sr, $sDocketColIdx).Text.Trim().ToUpper()
+                if ($docketVal -ne "") {
+                    $typeVal = $wsServiceSrc.Cells($sr, $sTypeColIdx).Text.Trim()
+                    $skuVal = $wsServiceSrc.Cells($sr, $sSkuColIdx).Text.Trim()
+                    $invoiceVal = $wsServiceSrc.Cells($sr, $sInvoiceColIdx).Text.Trim()
+                    
+                    $serviceSheetRows[$docketVal] = [PSCustomObject]@{
+                        Type          = $typeVal
+                        ItemSku       = $skuVal
+                        InvoiceNumber = $invoiceVal
+                    }
+                }
+            }
+            Write-Host "Successfully mapped $($serviceSheetRows.Count) dockets from Service sheet."
+        } else {
+            Write-Host "Service sheet not found."
+        }
+
         # Pre-pass to count duplicate customer names and addresses and resolve Route → Trip ID mappings
         $nameCounts   = @{}
         $addrCounts   = @{}
         $routeTripMap = @{}
+        $docketRouteMap = @{}
         
         for ($r = 2; $r -le $routeRows; $r++) {
             $routeVal = $wsRoute.Cells($r, $routeCol).Text.Trim()
@@ -398,11 +530,12 @@ try {
             $addrKey = $address.Trim().ToLower()
             $isDuplicate = (($cxKey -ne "" -and $nameCounts[$cxKey] -gt 1) -or ($addrKey -ne "" -and $addrCounts[$addrKey] -gt 1))
             
-            # Check if it is a service part or service route
+            # Check if it is a service part or service route or is present in Service sheet
             $platLower = $platform.ToLower().Trim()
             $isServicePart = ($platLower -ne "" -and $platLower -ne "wakefit" -and $platLower -ne "wakefit_retail" -and $platLower -ne "amazon" -and $platLower -ne "flipkart" -and $platLower -ne "offline")
             $isServiceRoute = ($routeVal -like "*Ser*" -or $routeVal -like "*Service*")
-            $isService = ($isServicePart -or $isServiceRoute)
+            $isServiceFromSheet = $serviceSheetRows.ContainsKey($docket.ToUpper())
+            $isService = ($isServicePart -or $isServiceRoute -or $isServiceFromSheet)
             
             $isReplacement = ($orderTypeVal -eq "Replacement")
             
@@ -479,32 +612,10 @@ try {
             }
             $targetRouteRow++
             
-            # 2. Populate SER-PARTS if it's a service order
-            if ($isService) {
-                # Populate SER-PARTS
-                # Columns: Platform, docket_number, item_sku, invoice_number, Route
-                $wsSerParts.Cells($targetSerRow, 1).Value2 = $platform
-                $wsSerParts.Cells($targetSerRow, 2).Value2 = $docket
-                $wsSerParts.Cells($targetSerRow, 3).Value2 = $desc
-                $wsSerParts.Cells($targetSerRow, 4).Value2 = $invoiceNo
-                $wsSerParts.Cells($targetSerRow, 5).Value2 = $routeVal
-                
-                $wsSerParts.Rows.Item($targetSerRow).RowHeight = 14.5
-                for ($c = 1; $c -le 5; $c++) {
-                    $cell = $wsSerParts.Cells($targetSerRow, $c)
-                    $cell.Font.Name = "Calibri"
-                    $cell.Font.Size = 11
-                    $cell.Font.Bold = $false
-                    $cell.Font.Color = 0
-                    $cell.HorizontalAlignment = -4108
-                    $cell.VerticalAlignment = -4108
-                    
-                    $cell.Borders.LineStyle = 1
-                    $cell.Borders.Weight = 2
-                    $cell.Borders.Color = 0
-                    $cell.Interior.ColorIndex = -4142
-                }
-                $targetSerRow++
+            # Map docket to route for SER-PARTS sheet population later
+            $docketKey = $docket.Trim().ToUpper()
+            if ($docketKey -ne "" -and $routeVal -ne "" -and $routeVal -ne "Not planned") {
+                $docketRouteMap[$docketKey] = $routeVal
             }
 
             # 3. Always populate INVOICE
@@ -582,6 +693,44 @@ try {
             $targetTripRow++
         }
         Write-Host "TRIP ID sheet populated with $(($targetTripRow - 2)) unique routes."
+
+        # Populate SER-PARTS sheet from Service sheet data using mapped routes
+        $targetSerRow = 2
+        if ($null -ne $wsServiceSrc) {
+            for ($sr = 2; $sr -le $sRows; $sr++) {
+                $docketVal = $wsServiceSrc.Cells($sr, $sDocketColIdx).Text.Trim()
+                $docketKey = $docketVal.ToUpper()
+                if ($docketKey -ne "" -and $docketRouteMap.ContainsKey($docketKey)) {
+                    $routeVal = $docketRouteMap[$docketKey]
+                    $typeVal = $wsServiceSrc.Cells($sr, $sTypeColIdx).Text.Trim()
+                    $skuVal = $wsServiceSrc.Cells($sr, $sSkuColIdx).Text.Trim()
+                    $invoiceVal = $wsServiceSrc.Cells($sr, $sInvoiceColIdx).Text.Trim()
+                    
+                    $wsSerParts.Cells($targetSerRow, 1).Value2 = $typeVal
+                    $wsSerParts.Cells($targetSerRow, 2).Value2 = $docketVal
+                    $wsSerParts.Cells($targetSerRow, 3).Value2 = $skuVal
+                    $wsSerParts.Cells($targetSerRow, 4).Value2 = $invoiceVal
+                    $wsSerParts.Cells($targetSerRow, 5).Value2 = $routeVal
+                    
+                    $wsSerParts.Rows.Item($targetSerRow).RowHeight = 14.5
+                    for ($c = 1; $c -le 5; $c++) {
+                        $cell = $wsSerParts.Cells($targetSerRow, $c)
+                        $cell.Font.Name = "Calibri"
+                        $cell.Font.Size = 11
+                        $cell.Font.Bold = $false
+                        $cell.Font.Color = 0
+                        $cell.HorizontalAlignment = -4108
+                        $cell.VerticalAlignment = -4108
+                        
+                        $cell.Borders.LineStyle = 1
+                        $cell.Borders.Weight = 2
+                        $cell.Borders.Color = 0
+                        $cell.Interior.ColorIndex = -4142
+                    }
+                    $targetSerRow++
+                }
+            }
+        }
         
         # Ensure gridlines are visible on all four new sheets
         $wsInv.Activate()

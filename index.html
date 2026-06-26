@@ -363,7 +363,7 @@
 
     <!-- Invisible file inputs -->
     <input type="file" id="fileInput" accept=".xlsx" style="display: none;">
-    <input type="file" id="tripFileInput" accept=".xlsx" style="display: none;">
+    <input type="file" id="tripFileInput" accept=".xlsx, .csv" style="display: none;">
     <input type="file" id="picklistFileInput" accept=".xlsx" style="display: none;">
 
     <!-- Step 1: Route Planning File -->
@@ -407,7 +407,7 @@
     <div class="drop-zone-trip" id="tripDropZone">
       <div class="drop-icon" style="font-size:2rem;">🚚</div>
       <div class="drop-text-sm" id="tripDropText">Upload Trip Number file here</div>
-      <div class="drop-subtext">File must have: Col A = Trip Number, Col B = Consignment Number</div>
+      <div class="drop-subtext">Supports .xlsx or .csv files (e.g. Order sheet)</div>
     </div>
     <div class="trip-status" id="tripStatus">
       <span>✅</span>
@@ -511,44 +511,134 @@
       if (e.dataTransfer.files.length > 0) handlePicklistFileSelect(e.dataTransfer.files[0]);
     });
 
-    // ── Parse Trip ID Excel file ──────────────────────────────────
+    // Helper to parse CSV text in browser
+    function parseCSV(text) {
+      const lines = [];
+      let row = [];
+      let inQuotes = false;
+      let currentVal = '';
+      
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        const nextChar = text[i+1];
+        
+        if (char === '"') {
+          if (inQuotes && nextChar === '"') {
+            currentVal += '"';
+            i++; // skip next quote
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === ',' && !inQuotes) {
+          row.push(currentVal);
+          currentVal = '';
+        } else if ((char === '\r' || char === '\n') && !inQuotes) {
+          if (char === '\r' && nextChar === '\n') {
+            i++;
+          }
+          row.push(currentVal);
+          lines.push(row);
+          row = [];
+          currentVal = '';
+        } else {
+          currentVal += char;
+        }
+      }
+      if (row.length > 0 || currentVal !== '') {
+        row.push(currentVal);
+        lines.push(row);
+      }
+      return lines;
+    }
+
+    // ── Parse Trip ID Excel/CSV file ──────────────────────────────
     async function handleTripFileSelect(file) {
       try {
-        const reader = new FileReader();
-        reader.onload = async function(e) {
-          try {
-            const arrayBuffer = e.target.result;
-            const wb = new ExcelJS.Workbook();
-            await wb.xlsx.load(arrayBuffer);
+        const newMap = {};
+        let count = 0;
 
-            // Use the first worksheet
-            const ws = wb.worksheets[0];
-            const newMap = {};
-            let count = 0;
+        if (file.name.endsWith('.csv')) {
+          const text = await file.text();
+          const rows = parseCSV(text);
+          if (rows.length > 0) {
+            const header = rows[0];
+            let tripColIdx = -1;
+            let consColIdx = -1;
+            for (let c = 0; c < header.length; c++) {
+              const val = (header[c] || '').toString().trim().toLowerCase();
+              if (val === 'trip number' || val === 'trip_number' || val === 'trip no') {
+                tripColIdx = c;
+              }
+              if (val === 'consignment number' || val === 'consignment_number' || val === 'consignment no' || val === 'docket no' || val === 'docket_number') {
+                consColIdx = c;
+              }
+            }
+            
+            // Fallbacks: Column C (index 2) and Column O (index 14) for order doc
+            if (tripColIdx === -1) {
+              tripColIdx = (header.length > 2) ? 2 : 0;
+            }
+            if (consColIdx === -1) {
+              consColIdx = (header.length > 14) ? 14 : 1;
+            }
 
-            ws.eachRow((row, rowNumber) => {
-              if (rowNumber === 1) return; // skip header
-              const tripNum  = (row.getCell(1).value || '').toString().trim();
-              const consNum  = (row.getCell(2).value || '').toString().trim().toUpperCase();
+            for (let r = 1; r < rows.length; r++) {
+              const row = rows[r];
+              if (!row || row.length <= Math.max(tripColIdx, consColIdx)) continue;
+              const tripNum = (row[tripColIdx] || '').toString().trim();
+              const consNum = (row[consColIdx] || '').toString().trim().toUpperCase();
               if (tripNum && consNum) {
                 newMap[consNum] = tripNum;
                 count++;
               }
-            });
-
-            tripIdMap = newMap;
-            tripDropText.textContent = file.name;
-            tripStatusText.textContent = `Trip ID file loaded — ${count} entries mapped`;
-            tripStatus.classList.add('visible');
-            tripDropZone.style.borderColor = 'var(--accent)';
-          } catch (err) {
-            console.error(err);
-            alert('Error reading Trip ID file: ' + err.message);
+            }
           }
-        };
-        reader.readAsArrayBuffer(file);
+        } else {
+          const arrayBuffer = await file.arrayBuffer();
+          const wb = new ExcelJS.Workbook();
+          await wb.xlsx.load(arrayBuffer);
+          const ws = wb.worksheets[0];
+          
+          let tripColIdx = -1;
+          let consColIdx = -1;
+          const firstRow = ws.getRow(1);
+          firstRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+            const val = (cell.value || '').toString().trim().toLowerCase();
+            if (val === 'trip number' || val === 'trip_number' || val === 'trip no') {
+              tripColIdx = colNumber;
+            }
+            if (val === 'consignment number' || val === 'consignment_number' || val === 'consignment no' || val === 'docket no' || val === 'docket_number') {
+              consColIdx = colNumber;
+            }
+          });
+
+          const maxCols = ws.actualColumnCount;
+          if (tripColIdx === -1) {
+            tripColIdx = (maxCols > 2) ? 3 : 1; // Col C (3) or Col A (1)
+          }
+          if (consColIdx === -1) {
+            consColIdx = (maxCols > 14) ? 15 : 2; // Col O (15) or Col B (2)
+          }
+
+          ws.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return;
+            const tripNum = (row.getCell(tripColIdx).value || '').toString().trim();
+            const consNum = (row.getCell(consColIdx).value || '').toString().trim().toUpperCase();
+            if (tripNum && consNum) {
+              newMap[consNum] = tripNum;
+              count++;
+            }
+          });
+        }
+
+        tripIdMap = newMap;
+        tripDropText.textContent = file.name;
+        tripStatusText.textContent = `Trip ID file loaded — ${count} entries mapped`;
+        tripStatus.classList.add('visible');
+        tripDropZone.style.borderColor = 'var(--accent)';
       } catch (err) {
-        alert('Error: ' + err.message);
+        console.error(err);
+        alert('Error reading Trip ID file: ' + err.message);
       }
     }
 
@@ -918,10 +1008,44 @@
               const typeCol       = headers['storage_location'] || headers['type'] || 15;
               const orderTypeCol  = headers['order_type'] || 21;
 
+              // Load Service sheet data if it exists
+              const serviceSheetRows = {};
+              const wsServiceSrc = workbook.getWorksheet('Service');
+              if (wsServiceSrc) {
+                const sCols = wsServiceSrc.columnCount;
+                const sHeaders = {};
+                const sHeaderRow = wsServiceSrc.getRow(1);
+                sHeaderRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                  const raw = (cell.value || '').toString().trim().toLowerCase();
+                  const norm = raw.replace(/\s+/g, '_').replace(/_+/g, '_');
+                  if (norm && !sHeaders[norm]) {
+                    sHeaders[norm] = colNumber;
+                  }
+                });
+
+                const sTypeColIdx = sHeaders['type'] || sHeaders['ty'] || 1;
+                const sDocketColIdx = sHeaders['docket_number'] || sHeaders['docket_no'] || 6;
+                const sSkuColIdx = sHeaders['item_sku'] || 4;
+                const sInvoiceColIdx = sHeaders['invoice_number'] || sHeaders['invoice_no'] || 5;
+
+                wsServiceSrc.eachRow((row, rowNumber) => {
+                  if (rowNumber === 1) return;
+                  const docketVal = (row.getCell(sDocketColIdx).value || '').toString().trim().toUpperCase();
+                  if (docketVal) {
+                    serviceSheetRows[docketVal] = {
+                      type: (row.getCell(sTypeColIdx).value || '').toString().trim(),
+                      sku: (row.getCell(sSkuColIdx).value || '').toString().trim(),
+                      invoice: (row.getCell(sInvoiceColIdx).value || '').toString().trim()
+                    };
+                  }
+                });
+              }
+
               // Pre-pass to count duplicate customer names and addresses and resolve Route → Trip ID mappings
               const nameCounts = {};
               const addrCounts = {};
               const routeTripMap = {};
+              const docketRouteMap = {};
               for (let r = 2; r <= routeRowsCount; r++) {
                 const routeRow = wsRoute.getRow(r);
                 const routeVal = (routeRow.getCell(routeCol).value || '').toString().trim();
@@ -983,7 +1107,10 @@
                 const isService = (() => {
                   const plat = (platform || '').toLowerCase().trim();
                   const stdPlats = ['wakefit', 'wakefit_retail', 'amazon', 'flipkart', 'offline'];
-                  return (!stdPlats.includes(plat) && plat !== '') || routeVal.toLowerCase().includes('ser');
+                  const isServicePart = !stdPlats.includes(plat) && plat !== '';
+                  const isServiceRoute = routeVal.toLowerCase().includes('ser');
+                  const isServiceFromSheet = !!serviceSheetRows[docket.toUpperCase()];
+                  return isServicePart || isServiceRoute || isServiceFromSheet;
                 })();
                 
                 const isReplacement = orderTypeVal === "Replacement";
@@ -1049,23 +1176,10 @@
                   }
                 });
                 
-                // 2. Populate SER-PARTS if it's a service order
-                if (isService) {
-                  const newSerRow = wsSerParts.addRow([
-                    platform, docket, desc, invoiceNo, routeVal
-                  ]);
-                  newSerRow.height = 14.5;
-                  serPartsCount++;
-                  newSerRow.eachCell((cell) => {
-                    cell.font = { name: 'Calibri', size: 11, bold: false, color: { argb: 'FF000000' } };
-                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
-                    cell.border = {
-                      top: { style: 'thin', color: { argb: 'FF000000' } },
-                      left: { style: 'thin', color: { argb: 'FF000000' } },
-                      bottom: { style: 'thin', color: { argb: 'FF000000' } },
-                      right: { style: 'thin', color: { argb: 'FF000000' } }
-                    };
-                  });
+                // Map docket to route for SER-PARTS sheet population later
+                const docketKey = docket.trim().toUpperCase();
+                if (docketKey && routeVal && routeVal !== "Not planned") {
+                  docketRouteMap[docketKey] = routeVal;
                 }
 
                 // 3. Always populate INVOICE
@@ -1134,6 +1248,52 @@
                 });
               }
 
+              // Populate SER-PARTS sheet from Service sheet data using mapped routes
+              if (wsServiceSrc) {
+                const sHeaderRow = wsServiceSrc.getRow(1);
+                const sHeaders = {};
+                sHeaderRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                  const raw = (cell.value || '').toString().trim().toLowerCase();
+                  const norm = raw.replace(/\s+/g, '_').replace(/_+/g, '_');
+                  if (norm && !sHeaders[norm]) {
+                    sHeaders[norm] = colNumber;
+                  }
+                });
+
+                const sTypeColIdx = sHeaders['type'] || sHeaders['ty'] || 1;
+                const sDocketColIdx = sHeaders['docket_number'] || sHeaders['docket_no'] || 6;
+                const sSkuColIdx = sHeaders['item_sku'] || 4;
+                const sInvoiceColIdx = sHeaders['invoice_number'] || sHeaders['invoice_no'] || 5;
+
+                wsServiceSrc.eachRow((row, rowNumber) => {
+                  if (rowNumber === 1) return;
+                  const docketVal = (row.getCell(sDocketColIdx).value || '').toString().trim();
+                  const docketKey = docketVal.toUpperCase();
+                  if (docketKey && docketRouteMap[docketKey]) {
+                    const routeVal = docketRouteMap[docketKey];
+                    const typeVal = (row.getCell(sTypeColIdx).value || '').toString().trim();
+                    const skuVal = (row.getCell(sSkuColIdx).value || '').toString().trim();
+                    const invoiceVal = (row.getCell(sInvoiceColIdx).value || '').toString().trim();
+
+                    const newSerRow = wsSerParts.addRow([
+                      typeVal, docketVal, skuVal, invoiceVal, routeVal
+                    ]);
+                    newSerRow.height = 14.5;
+                    serPartsCount++;
+                    newSerRow.eachCell((cell) => {
+                      cell.font = { name: 'Calibri', size: 11, bold: false, color: { argb: 'FF000000' } };
+                      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                      cell.border = {
+                        top: { style: 'thin', color: { argb: 'FF000000' } },
+                        left: { style: 'thin', color: { argb: 'FF000000' } },
+                        bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                        right: { style: 'thin', color: { argb: 'FF000000' } }
+                      };
+                    });
+                  }
+                });
+              }
+ 
               // Ensure gridlines are visible
               wsInv.views      = [{ showGridLines: true }];
               wsSerParts.views = [{ showGridLines: true }];
