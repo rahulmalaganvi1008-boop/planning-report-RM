@@ -499,6 +499,7 @@ try {
             }
         }
         
+        $addedSerDockets = @{}
         $targetRouteRow = 2
         $targetSerRow   = 2
         $targetTripRow  = 2
@@ -530,12 +531,18 @@ try {
             $addrKey = $address.Trim().ToLower()
             $isDuplicate = (($cxKey -ne "" -and $nameCounts[$cxKey] -gt 1) -or ($addrKey -ne "" -and $addrCounts[$addrKey] -gt 1))
             
-            # Check if it is a service part or service route or is present in Service sheet
+            # Copy background color from source platform cell
+            $platCell = $wsRoute.Cells($r, $platformCol)
+            $sourceColor = $platCell.Interior.Color
+            $sourceColorIdx = $platCell.Interior.ColorIndex
+            
+            # Check if it is a service part or service route or is present in Service sheet or has blue fill
             $platLower = $platform.ToLower().Trim()
             $isServicePart = ($platLower -ne "" -and $platLower -ne "wakefit" -and $platLower -ne "wakefit_retail" -and $platLower -ne "amazon" -and $platLower -ne "flipkart" -and $platLower -ne "offline")
             $isServiceRoute = ($routeVal -like "*Ser*" -or $routeVal -like "*Service*")
             $isServiceFromSheet = $serviceSheetRows.ContainsKey($docket.ToUpper())
-            $isService = ($isServicePart -or $isServiceRoute -or $isServiceFromSheet)
+            $isBlueColor = ($sourceColor -eq 15773696 -or $sourceColorIdx -eq 33 -or $sourceColorIdx -eq 34 -or $sourceColorIdx -eq 41 -or $sourceColorIdx -eq 42 -or ($sourceColor -eq 16773632) -or ($sourceColor -eq 16777164))
+            $isService = ($isServicePart -or $isServiceRoute -or $isServiceFromSheet -or $isBlueColor)
             
             $isReplacement = ($orderTypeVal -eq "Replacement")
             
@@ -551,11 +558,6 @@ try {
                     }
                 }
             }
-
-            # Copy background color from source platform cell
-            $platCell = $wsRoute.Cells($r, $platformCol)
-            $sourceColor = $platCell.Interior.Color
-            $sourceColorIdx = $platCell.Interior.ColorIndex
             
             # Get the resolved Trip Id for this route
             $tripId = $routeTripMap[$routeVal]
@@ -616,6 +618,42 @@ try {
             $docketKey = $docket.Trim().ToUpper()
             if ($docketKey -ne "" -and $routeVal -ne "" -and $routeVal -ne "Not planned") {
                 $docketRouteMap[$docketKey] = $routeVal
+                
+                # If this row is a service row, populate SER-PARTS sheet
+                if ($isService -and -not $addedSerDockets.ContainsKey($docketKey)) {
+                    $typeValSer = "SER"
+                    $skuValSer = $desc
+                    $invoiceValSer = $invoiceNo
+                    if ($null -ne $wsServiceSrc -and $serviceSheetRows.ContainsKey($docketKey)) {
+                        $sRowInfo = $serviceSheetRows[$docketKey]
+                        if ($sRowInfo.Type -ne "") { $typeValSer = $sRowInfo.Type }
+                        if ($sRowInfo.ItemSku -ne "") { $skuValSer = $sRowInfo.ItemSku }
+                        if ($sRowInfo.InvoiceNumber -ne "") { $invoiceValSer = $sRowInfo.InvoiceNumber }
+                    }
+                    
+                    $wsSerParts.Cells($targetSerRow, 1).Value2 = $typeValSer
+                    $wsSerParts.Cells($targetSerRow, 2).Value2 = $docket
+                    $wsSerParts.Cells($targetSerRow, 3).Value2 = $skuValSer
+                    $wsSerParts.Cells($targetSerRow, 4).Value2 = $invoiceValSer
+                    $wsSerParts.Cells($targetSerRow, 5).Value2 = $routeVal
+                    
+                    $wsSerParts.Rows.Item($targetSerRow).RowHeight = 14.5
+                    for ($c = 1; $c -le 5; $c++) {
+                        $cell = $wsSerParts.Cells($targetSerRow, $c)
+                        $cell.Font.Name = "Calibri"
+                        $cell.Font.Size = 11
+                        $cell.Font.Bold = $false
+                        $cell.Font.Color = 0
+                        $cell.HorizontalAlignment = -4108
+                        $cell.VerticalAlignment = -4108
+                        $cell.Borders.LineStyle = 1
+                        $cell.Borders.Weight = 2
+                        $cell.Borders.Color = 0
+                        $cell.Interior.ColorIndex = -4142
+                    }
+                    $targetSerRow++
+                    $addedSerDockets[$docketKey] = $true
+                }
             }
 
             # 3. Always populate INVOICE
@@ -694,13 +732,12 @@ try {
         }
         Write-Host "TRIP ID sheet populated with $(($targetTripRow - 2)) unique routes."
 
-        # Populate SER-PARTS sheet from Service sheet data using mapped routes
-        $targetSerRow = 2
+        # Populate SER-PARTS sheet from Service sheet data using mapped routes (remaining unmatched items)
         if ($null -ne $wsServiceSrc) {
             for ($sr = 2; $sr -le $sRows; $sr++) {
                 $docketVal = $wsServiceSrc.Cells($sr, $sDocketColIdx).Text.Trim()
                 $docketKey = $docketVal.ToUpper()
-                if ($docketKey -ne "" -and $docketRouteMap.ContainsKey($docketKey)) {
+                if ($docketKey -ne "" -and $docketRouteMap.ContainsKey($docketKey) -and -not $addedSerDockets.ContainsKey($docketKey)) {
                     $routeVal = $docketRouteMap[$docketKey]
                     $typeVal = $wsServiceSrc.Cells($sr, $sTypeColIdx).Text.Trim()
                     $skuVal = $wsServiceSrc.Cells($sr, $sSkuColIdx).Text.Trim()
@@ -728,6 +765,7 @@ try {
                         $cell.Interior.ColorIndex = -4142
                     }
                     $targetSerRow++
+                    $addedSerDockets[$docketKey] = $true
                 }
             }
         }

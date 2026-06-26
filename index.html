@@ -441,6 +441,52 @@
   </div>
 
   <script>
+    function getCellText(cell) {
+      if (!cell) return '';
+      let val = cell.value;
+      if (val === null || val === undefined) return '';
+      
+      if (typeof val === 'object') {
+        if (val instanceof Date) {
+          return val.toLocaleDateString();
+        }
+        if (val.result !== undefined && val.result !== null) {
+          let res = val.result;
+          if (typeof res === 'object') {
+            if (res.error) return '';
+            return JSON.stringify(res);
+          }
+          return String(res).trim();
+        }
+        if (val.richText) {
+          return val.richText.map(t => t.text || '').join('').trim();
+        }
+        if (typeof val.toString === 'function' && val.toString() !== '[object Object]') {
+          return val.toString().trim();
+        }
+        return '';
+      }
+      return String(val).trim();
+    }
+
+    function isBlueColor(cell) {
+      if (!cell || !cell.fill || cell.fill.type !== 'pattern' || !cell.fill.fgColor) {
+        return false;
+      }
+      const fgColor = cell.fill.fgColor;
+      if (fgColor.argb) {
+        const argb = fgColor.argb.toUpperCase();
+        const blueColors = [
+          'FF00B0F0', 'FF0070C0', 'FF1F4E78', 'FFD9E1F2', 'FFB4C6E7', 
+          'FF8EA9DB', 'FF4472C4', 'FF2F5597', 'FFADD8E6', 'FF87CEEB', 
+          'FF00BFFF', 'FF1E90FF', 'FF6495ED', 'FF4682B4'
+        ];
+        if (blueColors.includes(argb)) return true;
+        if (argb.endsWith('00B0F0') || argb.endsWith('0070C0') || argb.endsWith('D9E1F2') || argb.endsWith('B4C6E7')) return true;
+      }
+      return false;
+    }
+
     const dropZone     = document.getElementById('dropZone');
     const fileInput    = document.getElementById('fileInput');
     const dropText     = document.getElementById('dropText');
@@ -603,7 +649,7 @@
           let consColIdx = -1;
           const firstRow = ws.getRow(1);
           firstRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-            const val = (cell.value || '').toString().trim().toLowerCase();
+            const val = getCellText(cell).toLowerCase();
             if (val === 'trip number' || val === 'trip_number' || val === 'trip no') {
               tripColIdx = colNumber;
             }
@@ -622,8 +668,8 @@
 
           ws.eachRow((row, rowNumber) => {
             if (rowNumber === 1) return;
-            const tripNum = (row.getCell(tripColIdx).value || '').toString().trim();
-            const consNum = (row.getCell(consColIdx).value || '').toString().trim().toUpperCase();
+            const tripNum = getCellText(row.getCell(tripColIdx));
+            const consNum = getCellText(row.getCell(consColIdx)).toUpperCase();
             if (tripNum && consNum) {
               newMap[consNum] = tripNum;
               count++;
@@ -662,7 +708,7 @@
             let areaColIdx = -1;
             const firstRow = ws.getRow(1);
             firstRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-              const val = (cell.value || '').toString().trim().toLowerCase();
+              const val = getCellText(cell).toLowerCase();
               if (val.includes('docket') || val.includes('consignment') || val.includes('awb')) {
                 docketColIdx = colNumber;
               }
@@ -676,8 +722,8 @@
 
             ws.eachRow((row, rowNumber) => {
               if (rowNumber === 1) return; // skip header
-              const docket = (row.getCell(docketColIdx).value || '').toString().trim().toUpperCase();
-              const area = (row.getCell(areaColIdx).value || '').toString().trim();
+              const docket = getCellText(row.getCell(docketColIdx)).toUpperCase();
+              const area = getCellText(row.getCell(areaColIdx));
               if (docket && area) {
                 newMap[docket] = area;
                 count++;
@@ -986,7 +1032,7 @@
               const headers = {};
               const routeHeaderRow = wsRoute.getRow(1);
               routeHeaderRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-                const rawText = (cell.value || '').toString().trim().toLowerCase();
+                const rawText = getCellText(cell).toLowerCase();
                 const normalized = rawText.replace(/\s+/g, '_').replace(/_+/g, '_');
                 if (normalized && !headers[normalized]) {
                   headers[normalized] = colNumber;
@@ -1016,7 +1062,7 @@
                 const sHeaders = {};
                 const sHeaderRow = wsServiceSrc.getRow(1);
                 sHeaderRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-                  const raw = (cell.value || '').toString().trim().toLowerCase();
+                  const raw = getCellText(cell).toLowerCase();
                   const norm = raw.replace(/\s+/g, '_').replace(/_+/g, '_');
                   if (norm && !sHeaders[norm]) {
                     sHeaders[norm] = colNumber;
@@ -1030,12 +1076,12 @@
 
                 wsServiceSrc.eachRow((row, rowNumber) => {
                   if (rowNumber === 1) return;
-                  const docketVal = (row.getCell(sDocketColIdx).value || '').toString().trim().toUpperCase();
+                  const docketVal = getCellText(row.getCell(sDocketColIdx)).toUpperCase();
                   if (docketVal) {
                     serviceSheetRows[docketVal] = {
-                      type: (row.getCell(sTypeColIdx).value || '').toString().trim(),
-                      sku: (row.getCell(sSkuColIdx).value || '').toString().trim(),
-                      invoice: (row.getCell(sInvoiceColIdx).value || '').toString().trim()
+                      type: getCellText(row.getCell(sTypeColIdx)),
+                      sku: getCellText(row.getCell(sSkuColIdx)),
+                      invoice: getCellText(row.getCell(sInvoiceColIdx))
                     };
                   }
                 });
@@ -1046,13 +1092,14 @@
               const addrCounts = {};
               const routeTripMap = {};
               const docketRouteMap = {};
+              const addedSerDockets = new Set();
               for (let r = 2; r <= routeRowsCount; r++) {
                 const routeRow = wsRoute.getRow(r);
-                const routeVal = (routeRow.getCell(routeCol).value || '').toString().trim();
+                const routeVal = getCellText(routeRow.getCell(routeCol));
                 if (routeVal === "" || routeVal === "Not planned") continue;
                 
-                const cxName = (routeRow.getCell(cxNameCol).value || '').toString().trim().toLowerCase();
-                const address = (routeRow.getCell(addressCol).value || '').toString().trim().toLowerCase();
+                const cxName = getCellText(routeRow.getCell(cxNameCol)).toLowerCase();
+                const address = getCellText(routeRow.getCell(addressCol)).toLowerCase();
                 if (cxName) {
                   nameCounts[cxName] = (nameCounts[cxName] || 0) + 1;
                 }
@@ -1061,7 +1108,7 @@
                 }
 
                 // Map Route to Trip Number if docket is in tripIdMap
-                const docketVal = (routeRow.getCell(docketCol).value || '').toString().trim().toUpperCase();
+                const docketVal = getCellText(routeRow.getCell(docketCol)).toUpperCase();
                 if (tripIdMap[docketVal]) {
                   routeTripMap[routeVal] = tripIdMap[docketVal];
                 }
@@ -1070,7 +1117,7 @@
               // Ensure all routes exist in the map
               for (let r = 2; r <= routeRowsCount; r++) {
                 const routeRow = wsRoute.getRow(r);
-                const routeVal = (routeRow.getCell(routeCol).value || '').toString().trim();
+                const routeVal = getCellText(routeRow.getCell(routeCol));
                 if (routeVal === "" || routeVal === "Not planned") continue;
                 if (routeTripMap[routeVal] === undefined) {
                   routeTripMap[routeVal] = '';
@@ -1079,45 +1126,47 @@
               
               for (let r = 2; r <= routeRowsCount; r++) {
                 const routeRow = wsRoute.getRow(r);
-                const routeVal = (routeRow.getCell(routeCol).value || '').toString().trim();
+                const routeVal = getCellText(routeRow.getCell(routeCol));
                 
                 // Skip if route is empty or "Not planned"
                 if (routeVal === "" || routeVal === "Not planned") {
                   continue;
                 }
                 
-                const platform        = (routeRow.getCell(platformCol).value || '').toString();
-                const docket          = (routeRow.getCell(docketCol).value || '').toString().trim();
-                const desc            = (routeRow.getCell(descCol).value || '').toString();
-                const cxName          = (routeRow.getCell(cxNameCol).value || '').toString();
-                const mob1            = (routeRow.getCell(mob1Col).value || '').toString();
-                const mob2            = (routeRow.getCell(mob2Col).value || '').toString();
-                const address         = (routeRow.getCell(addressCol).value || '').toString();
-                const code            = (routeRow.getCell(codeCol).value || '').toString();
-                const payType         = (routeRow.getCell(payTypeCol).value || '').toString();
-                const invoiceNo       = (routeRow.getCell(invoiceNoCol).value || '').toString();
-                let storageLocation = (routeRow.getCell(typeCol).value || '').toString().trim();
-                const orderTypeVal  = (routeRow.getCell(orderTypeCol).value || '').toString().trim();
+                const platform        = getCellText(routeRow.getCell(platformCol));
+                const docket          = getCellText(routeRow.getCell(docketCol));
+                const desc            = getCellText(routeRow.getCell(descCol));
+                const cxName          = getCellText(routeRow.getCell(cxNameCol));
+                const mob1            = getCellText(routeRow.getCell(mob1Col));
+                const mob2            = getCellText(routeRow.getCell(mob2Col));
+                const address         = getCellText(routeRow.getCell(addressCol));
+                const code            = getCellText(routeRow.getCell(codeCol));
+                const payType         = getCellText(routeRow.getCell(payTypeCol));
+                const invoiceNo       = getCellText(routeRow.getCell(invoiceNoCol));
+                let storageLocation   = getCellText(routeRow.getCell(typeCol));
+                const orderTypeVal    = getCellText(routeRow.getCell(orderTypeCol));
                 
                 const nameKey = cxName.trim().toLowerCase();
                 const addrKey = address.trim().toLowerCase();
                 const isDuplicate = (nameKey && nameCounts[nameKey] > 1) || (addrKey && addrCounts[addrKey] > 1);
                 
-                // Helper to check if it's a service part or service route
+                const sourcePlatCell = routeRow.getCell(platformCol);
+
+                // Helper to check if it's a service part or service route or colored blue
                 const isService = (() => {
                   const plat = (platform || '').toLowerCase().trim();
                   const stdPlats = ['wakefit', 'wakefit_retail', 'amazon', 'flipkart', 'offline'];
                   const isServicePart = !stdPlats.includes(plat) && plat !== '';
                   const isServiceRoute = routeVal.toLowerCase().includes('ser');
                   const isServiceFromSheet = !!serviceSheetRows[docket.toUpperCase()];
-                  return isServicePart || isServiceRoute || isServiceFromSheet;
+                  const isBlue = isBlueColor(sourcePlatCell);
+                  return isServicePart || isServiceRoute || isServiceFromSheet || isBlue;
                 })();
                 
                 const isReplacement = orderTypeVal === "Replacement";
                 
                 // Copy highlight color from source platform cell
                 let targetFill = null;
-                const sourcePlatCell = routeRow.getCell(platformCol);
                 if (sourcePlatCell.fill && sourcePlatCell.fill.type === 'pattern' && sourcePlatCell.fill.fgColor) {
                   targetFill = JSON.parse(JSON.stringify(sourcePlatCell.fill));
                 }
@@ -1180,6 +1229,36 @@
                 const docketKey = docket.trim().toUpperCase();
                 if (docketKey && routeVal && routeVal !== "Not planned") {
                   docketRouteMap[docketKey] = routeVal;
+
+                  // If this row is a service row, populate SER-PARTS sheet
+                  if (isService && !addedSerDockets.has(docketKey)) {
+                    let typeValSer = "SER";
+                    let skuValSer = desc;
+                    let invoiceValSer = invoiceNo;
+                    if (serviceSheetRows[docketKey]) {
+                      const sRowInfo = serviceSheetRows[docketKey];
+                      if (sRowInfo.type) typeValSer = sRowInfo.type;
+                      if (sRowInfo.sku) skuValSer = sRowInfo.sku;
+                      if (sRowInfo.invoice) invoiceValSer = sRowInfo.invoice;
+                    }
+                    
+                    const newSerRow = wsSerParts.addRow([
+                      typeValSer, docket, skuValSer, invoiceValSer, routeVal
+                    ]);
+                    newSerRow.height = 14.5;
+                    serPartsCount++;
+                    newSerRow.eachCell((cell) => {
+                      cell.font = { name: 'Calibri', size: 11, bold: false, color: { argb: 'FF000000' } };
+                      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                      cell.border = {
+                        top: { style: 'thin', color: { argb: 'FF000000' } },
+                        left: { style: 'thin', color: { argb: 'FF000000' } },
+                        bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                        right: { style: 'thin', color: { argb: 'FF000000' } }
+                      };
+                    });
+                    addedSerDockets.add(docketKey);
+                  }
                 }
 
                 // 3. Always populate INVOICE
@@ -1248,12 +1327,12 @@
                 });
               }
 
-              // Populate SER-PARTS sheet from Service sheet data using mapped routes
+              // Populate SER-PARTS sheet from Service sheet data using mapped routes (remaining unmatched items)
               if (wsServiceSrc) {
                 const sHeaderRow = wsServiceSrc.getRow(1);
                 const sHeaders = {};
                 sHeaderRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-                  const raw = (cell.value || '').toString().trim().toLowerCase();
+                  const raw = getCellText(cell).toLowerCase();
                   const norm = raw.replace(/\s+/g, '_').replace(/_+/g, '_');
                   if (norm && !sHeaders[norm]) {
                     sHeaders[norm] = colNumber;
@@ -1267,13 +1346,13 @@
 
                 wsServiceSrc.eachRow((row, rowNumber) => {
                   if (rowNumber === 1) return;
-                  const docketVal = (row.getCell(sDocketColIdx).value || '').toString().trim();
+                  const docketVal = getCellText(row.getCell(sDocketColIdx));
                   const docketKey = docketVal.toUpperCase();
-                  if (docketKey && docketRouteMap[docketKey]) {
+                  if (docketKey && docketRouteMap[docketKey] && !addedSerDockets.has(docketKey)) {
                     const routeVal = docketRouteMap[docketKey];
-                    const typeVal = (row.getCell(sTypeColIdx).value || '').toString().trim();
-                    const skuVal = (row.getCell(sSkuColIdx).value || '').toString().trim();
-                    const invoiceVal = (row.getCell(sInvoiceColIdx).value || '').toString().trim();
+                    const typeVal = getCellText(row.getCell(sTypeColIdx));
+                    const skuVal = getCellText(row.getCell(sSkuColIdx));
+                    const invoiceVal = getCellText(row.getCell(sInvoiceColIdx));
 
                     const newSerRow = wsSerParts.addRow([
                       typeVal, docketVal, skuVal, invoiceVal, routeVal
@@ -1290,6 +1369,7 @@
                         right: { style: 'thin', color: { argb: 'FF000000' } }
                       };
                     });
+                    addedSerDockets.add(docketKey);
                   }
                 });
               }
