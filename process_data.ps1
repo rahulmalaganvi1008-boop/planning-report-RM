@@ -450,6 +450,7 @@ try {
             $sAltMobileColIdx = if ($sHeaders.ContainsKey("alternate_mobile_number")) { $sHeaders["alternate_mobile_number"] } else { 11 }
             $sRemarksColIdx = if ($sHeaders.ContainsKey("remarks")) { $sHeaders["remarks"] } else { 12 }
             $sServiceColIdx = if ($sHeaders.ContainsKey("service")) { $sHeaders["service"] } else { 2 }
+            $sRouteColIdx = if ($sHeaders.ContainsKey("route")) { $sHeaders["route"] } else { $null }
 
             for ($sr = 2; $sr -le $sRows; $sr++) {
                 $docketVal = $wsServiceSrc.Cells($sr, $sDocketColIdx).Text.Trim().ToUpper()
@@ -478,6 +479,7 @@ try {
                     $altMobileVal = $wsServiceSrc.Cells($sr, $sAltMobileColIdx).Text.Trim()
                     $remarksVal = $wsServiceSrc.Cells($sr, $sRemarksColIdx).Text.Trim()
                     $serviceVal = $wsServiceSrc.Cells($sr, $sServiceColIdx).Text.Trim()
+                    $routeValFromService = if ($null -ne $sRouteColIdx) { $wsServiceSrc.Cells($sr, $sRouteColIdx).Text.Trim() } else { "" }
 
                     $serviceSheetRows[$docketVal] = [PSCustomObject]@{
                         Type                   = $typeVal
@@ -492,6 +494,7 @@ try {
                         AlternateMobileNumber  = $altMobileVal
                         Remarks                = $remarksVal
                         Service                = $serviceVal
+                        Route                  = $routeValFromService
                     }
                 }
             }
@@ -810,13 +813,15 @@ try {
                     $cxName = $sRowInfo.CxName.ToLower()
                     $addr = $sRowInfo.Address.ToLower()
                     
-                    $routeVal = ""
-                    if ($orderId -ne "" -and $routeByOrderId.ContainsKey($orderId)) {
-                        $routeVal = $routeByOrderId[$orderId]
-                    } elseif ($routeByDocket.ContainsKey($docketKey)) {
-                        $routeVal = $routeByDocket[$docketKey]
-                    } elseif ($cxName -ne "" -and $addr -ne "" -and $routeByCust.ContainsKey("$cxName|$addr")) {
-                        $routeVal = $routeByCust["$cxName|$addr"]
+                    $routeVal = $sRowInfo.Route
+                    if ($routeVal -eq "") {
+                        if ($orderId -ne "" -and $routeByOrderId.ContainsKey($orderId)) {
+                            $routeVal = $routeByOrderId[$orderId]
+                        } elseif ($routeByDocket.ContainsKey($docketKey)) {
+                            $routeVal = $routeByDocket[$docketKey]
+                        } elseif ($cxName -ne "" -and $addr -ne "" -and $routeByCust.ContainsKey("$cxName|$addr")) {
+                            $routeVal = $routeByCust["$cxName|$addr"]
+                        }
                     }
                     
                     # Extract values

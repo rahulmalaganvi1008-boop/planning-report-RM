@@ -1081,6 +1081,7 @@
                 const sAltMobileColIdx = sHeaders['alternate_mobile_number'] || 11;
                 const sRemarksColIdx = sHeaders['remarks'] || 12;
                 const sServiceColIdx = sHeaders['service'] || 2;
+                const sRouteColIdx = sHeaders['route'] || null;
 
                 wsServiceSrc.eachRow((row, rowNumber) => {
                   if (rowNumber === 1) return;
@@ -1099,7 +1100,8 @@
                       mobileNumber: getCellText(row.getCell(sMobileColIdx)),
                       alternateMobileNumber: getCellText(row.getCell(sAltMobileColIdx)),
                       remarks: getCellText(row.getCell(sRemarksColIdx)),
-                      service: getCellText(row.getCell(sServiceColIdx))
+                      service: getCellText(row.getCell(sServiceColIdx)),
+                      route: sRouteColIdx ? getCellText(row.getCell(sRouteColIdx)) : ''
                     };
                   }
                 });
@@ -1394,13 +1396,15 @@
                   const cxName = sRowInfo.cxName.trim().toLowerCase();
                   const addr = sRowInfo.address.trim().toLowerCase();
                   
-                  let routeVal = '';
-                  if (orderId && routeByOrderId[orderId]) {
-                    routeVal = routeByOrderId[orderId];
-                  } else if (routeByDocket[docketKey]) {
-                    routeVal = routeByDocket[docketKey];
-                  } else if (cxName && addr && routeByCust[cxName + '|' + addr]) {
-                    routeVal = routeByCust[cxName + '|' + addr];
+                  let routeVal = sRowInfo.route || '';
+                  if (!routeVal) {
+                    if (orderId && routeByOrderId[orderId]) {
+                      routeVal = routeByOrderId[orderId];
+                    } else if (routeByDocket[docketKey]) {
+                      routeVal = routeByDocket[docketKey];
+                    } else if (cxName && addr && routeByCust[cxName + '|' + addr]) {
+                      routeVal = routeByCust[cxName + '|' + addr];
+                    }
                   }
                   
                   let platform = sRowInfo.service || sRowInfo.type;
