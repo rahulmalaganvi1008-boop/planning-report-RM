@@ -920,7 +920,7 @@
               
               // Set up Column definitions for SER-PARTS
               wsSerParts.columns = [
-                { header: 'Type', key: 'platform', width: 36.1 },
+                { header: 'SERVICE', key: 'platform', width: 36.1 },
                 { header: 'docket_number', key: 'docket', width: 15.6 },
                 { header: 'item_sku', key: 'sku', width: 39.1 },
                 { header: 'invoice_number', key: 'invoiceNo', width: 17.5 },
@@ -1269,18 +1269,18 @@
 
                   // If this row is a service row, populate SER-PARTS sheet
                   if (isService && !addedSerDockets.has(docketKey)) {
-                    let typeValSer = "SER";
+                    let serviceValSer = "";
                     let skuValSer = desc;
                     let invoiceValSer = invoiceNo;
                     if (serviceSheetRows[docketKey]) {
                       const sRowInfo = serviceSheetRows[docketKey];
-                      if (sRowInfo.type) typeValSer = sRowInfo.type;
+                      serviceValSer = sRowInfo.service;
                       if (sRowInfo.sku) skuValSer = sRowInfo.sku;
                       if (sRowInfo.invoice) invoiceValSer = sRowInfo.invoice;
                     }
                     
                     const newSerRow = wsSerParts.addRow([
-                      typeValSer, docket, skuValSer, invoiceValSer, routeVal
+                      serviceValSer, docket, skuValSer, invoiceValSer, routeVal
                     ]);
                     newSerRow.height = 14.5;
                     serPartsCount++;
@@ -1414,7 +1414,7 @@
                   
                   // 1. Always Populate SER-PARTS sheet
                   const newSerRow = wsSerParts.addRow([
-                    sRowInfo.type, docketVal, desc, invoiceNo, routeVal
+                    sRowInfo.service, docketVal, desc, invoiceNo, routeVal
                   ]);
                   newSerRow.height = 14.5;
                   serPartsCount++;

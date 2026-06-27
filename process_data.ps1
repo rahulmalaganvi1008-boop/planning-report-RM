@@ -114,7 +114,7 @@ try {
         $routeHeaderRange.Borders.Color = 0
         
         # Set up Column widths for SER-PARTS
-        # Columns: Type, docket_number, item_sku, invoice_number, Route
+        # Columns: SERVICE, docket_number, item_sku, invoice_number, Route
         $serWidths = @(36.1, 15.6, 39.1, 17.5, 10.9)
         for ($c = 1; $c -le 5; $c++) {
             $wsSerParts.Columns.Item($c).ColumnWidth = $serWidths[$c - 1]
@@ -122,7 +122,7 @@ try {
         $wsSerParts.Columns.Item(4).NumberFormat = "@"
         
         # Setup Headers for SER-PARTS
-        $serHeaders = @("Type", "docket_number", "item_sku", "invoice_number", "Route")
+        $serHeaders = @("SERVICE", "docket_number", "item_sku", "invoice_number", "Route")
         for ($c = 1; $c -le 5; $c++) {
             $cell = $wsSerParts.Cells(1, $c)
             $cell.Value2 = $serHeaders[$c - 1]
@@ -679,17 +679,17 @@ try {
                 
                 # If this row is a service row, populate SER-PARTS sheet
                 if ($isService -and -not $addedSerDockets.ContainsKey($docketKey)) {
-                    $typeValSer = "SER"
+                    $serviceValSer = ""
                     $skuValSer = $desc
                     $invoiceValSer = $invoiceNo
                     if ($null -ne $wsServiceSrc -and $serviceSheetRows.ContainsKey($docketKey)) {
                         $sRowInfo = $serviceSheetRows[$docketKey]
-                        if ($sRowInfo.Type -ne "") { $typeValSer = $sRowInfo.Type }
+                        $serviceValSer = $sRowInfo.Service
                         if ($sRowInfo.ItemSku -ne "") { $skuValSer = $sRowInfo.ItemSku }
                         if ($sRowInfo.InvoiceNumber -ne "") { $invoiceValSer = $sRowInfo.InvoiceNumber }
                     }
                     
-                    $wsSerParts.Cells($targetSerRow, 1).Value2 = $typeValSer
+                    $wsSerParts.Cells($targetSerRow, 1).Value2 = $serviceValSer
                     $wsSerParts.Cells($targetSerRow, 2).Value2 = $docket
                     $wsSerParts.Cells($targetSerRow, 3).Value2 = $skuValSer
                     $wsSerParts.Cells($targetSerRow, 4).Value2 = $invoiceValSer
@@ -832,7 +832,7 @@ try {
                     $typeVal = "SER"
                     
                     # 1. Always Populate SER-PARTS sheet
-                    $wsSerParts.Cells($targetSerRow, 1).Value2 = $sRowInfo.Type
+                    $wsSerParts.Cells($targetSerRow, 1).Value2 = $sRowInfo.Service
                     $wsSerParts.Cells($targetSerRow, 2).Value2 = $docketVal
                     $wsSerParts.Cells($targetSerRow, 3).Value2 = $desc
                     $wsSerParts.Cells($targetSerRow, 4).Value2 = $invoiceNo
