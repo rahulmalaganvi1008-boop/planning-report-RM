@@ -1220,8 +1220,8 @@
                   }
                 }
 
-                // Get the resolved Trip Id for this route
-                const tripId = routeTripMap[routeVal] || '';
+                // Get the resolved Trip Id for this docket
+                const tripId = tripIdMap[docketKey] || 'NA';
 
                 // 1. Populate ROUTE sheet
                 const newRouteRow = wsRouteOut.addRow([
@@ -1432,7 +1432,7 @@
 
                   // 2. Only Populate ROUTE and INVOICE sheets if route is valid
                   if (routeVal !== "" && routeVal !== "Not planned") {
-                    const tripId = routeTripMap[routeVal] || '';
+                    const tripId = tripIdMap[docketKey] || 'NA';
                     
                     // Populate ROUTE sheet
                     const newRouteRow = wsRouteOut.addRow([

@@ -617,8 +617,11 @@ try {
                 }
             }
             
-            # Get the resolved Trip Id for this route
-            $tripId = $routeTripMap[$routeVal]
+            # Get the resolved Trip Id for this docket
+            $tripId = "NA"
+            if ($tripIdMap.ContainsKey($docketKey)) {
+                $tripId = $tripIdMap[$docketKey]
+            }
 
             # 1. Populate ROUTE sheet
             # Columns: Platform, docket_number, item_sku, invoice_number, Route, Type, Remarks, Bags, Roll, Trip Id
@@ -868,9 +871,9 @@ try {
                         $wsRouteOut.Cells($targetRouteRow, 8).Value2 = ""
                         $wsRouteOut.Cells($targetRouteRow, 9).Value2 = ""
                         
-                        $tripId = ""
-                        if ($routeTripMap.ContainsKey($routeVal)) {
-                            $tripId = $routeTripMap[$routeVal]
+                        $tripId = "NA"
+                        if ($tripIdMap.ContainsKey($docketKey)) {
+                            $tripId = $tripIdMap[$docketKey]
                         }
                         $wsRouteOut.Cells($targetRouteRow, 10).Value2 = $tripId
                         
