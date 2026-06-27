@@ -1,8 +1,8 @@
 $listener = New-Object System.Net.HttpListener
-$listener.Prefixes.Add("http://localhost:8080/")
+$listener.Prefixes.Add("http://localhost:8081/")
 try {
     $listener.Start()
-    Write-Host "Web server started! Listening on http://localhost:8080/index.html"
+    Write-Host "Web server started! Listening on http://localhost:8081/index.html"
 } catch {
     Write-Host "Failed to start server: $_"
     exit 1
