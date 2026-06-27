@@ -604,10 +604,10 @@ try {
             
             $isReplacement = ($orderTypeVal -eq "Replacement")
             
+            $docketKey = $docket.Trim().ToUpper()
             if ($isService) {
                 $typeVal = "SER"
             } else {
-                $docketKey = $docket.Trim().ToUpper()
                 if ($picklistMap.Count -gt 0 -and $picklistMap.ContainsKey($docketKey)) {
                     $typeVal = $picklistMap[$docketKey]
                 } else {

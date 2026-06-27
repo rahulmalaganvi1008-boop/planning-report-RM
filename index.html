@@ -1208,11 +1208,11 @@
                   targetFill = JSON.parse(JSON.stringify(sourcePlatCell.fill));
                 }
                 
+                const docketKey = docket.trim().toUpperCase();
                 let finalTypeVal = storageLocation;
                 if (isService) {
                   finalTypeVal = "SER";
                 } else {
-                  const docketKey = docket.trim().toUpperCase();
                   if (Object.keys(picklistMap).length > 0 && picklistMap[docketKey]) {
                     finalTypeVal = picklistMap[docketKey];
                   } else {
