@@ -682,6 +682,8 @@
         tripStatusText.textContent = `Trip ID file loaded — ${count} entries mapped`;
         tripStatus.classList.add('visible');
         tripDropZone.style.borderColor = 'var(--accent)';
+        // Show Convert button if main Route Planning file is already loaded
+        if (currentFile) actionPanel.style.display = 'flex';
       } catch (err) {
         console.error(err);
         alert('Error reading Trip ID file: ' + err.message);
@@ -735,6 +737,8 @@
             picklistStatusText.textContent = `Picklist file loaded — ${count} entries mapped`;
             picklistStatus.classList.add('visible');
             picklistDropZone.style.borderColor = 'var(--primary)';
+            // Show Convert button if main Route Planning file is already loaded
+            if (currentFile) actionPanel.style.display = 'flex';
           } catch (err) {
             console.error(err);
             alert('Error reading Picklist file: ' + err.message);
@@ -1500,6 +1504,8 @@
               progressBar.style.width = '100%';
               progressContainer.style.display = 'none';
               showMessage(`Successfully generated sheets (INVOICE: ${invoiceCount} rows, SER-PARTS: ${serPartsCount} rows, ROUTE: ${routeCount} rows) and downloaded ${outputFileName}!`, 'success');
+              // Bring back the Convert button so user can download again without refreshing
+              actionPanel.style.display = 'flex';
             }
           } catch (err) {
             console.error(err);
