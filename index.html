@@ -920,7 +920,7 @@
               
               // Set up Column definitions for SER-PARTS
               wsSerParts.columns = [
-                { header: 'Platform', key: 'platform', width: 36.1 },
+                { header: 'Type', key: 'platform', width: 36.1 },
                 { header: 'docket_number', key: 'docket', width: 15.6 },
                 { header: 'item_sku', key: 'sku', width: 39.1 },
                 { header: 'invoice_number', key: 'invoiceNo', width: 17.5 },
@@ -1403,45 +1403,12 @@
                     routeVal = routeByCust[cxName + '|' + addr];
                   }
                   
-                  // If route is empty or "Not planned", do not add to ROUTE, INVOICE, or SER-PARTS
-                  if (routeVal === "" || routeVal === "Not planned") {
-                    return;
-                  }
-                  
                   let platform = sRowInfo.service || sRowInfo.type;
                   let desc = sRowInfo.sku;
                   let invoiceNo = sRowInfo.invoice;
                   let finalTypeVal = "SER";
                   
-                  const tripId = routeTripMap[routeVal] || '';
-                  
-                  // 1. Populate ROUTE sheet
-                  const newRouteRow = wsRouteOut.addRow([
-                    platform, docketVal, desc, invoiceNo, routeVal, finalTypeVal, '', '', '', tripId
-                  ]);
-                  newRouteRow.height = 14.5;
-                  routeCount++;
-                  
-                  newRouteRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-                    cell.font = { name: 'Calibri', size: 11, color: { argb: 'FF000000' } };
-                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
-                    cell.border = {
-                      top: { style: 'thin', color: { argb: 'FF000000' } },
-                      left: { style: 'thin', color: { argb: 'FF000000' } },
-                      bottom: { style: 'thin', color: { argb: 'FF000000' } },
-                      right: { style: 'thin', color: { argb: 'FF000000' } }
-                    };
-                    
-                    if (colNumber <= 5) {
-                      cell.fill = {
-                        type: 'pattern',
-                        pattern: 'solid',
-                        fgColor: { argb: 'FF00B0F0' } // Sky Blue
-                      };
-                    }
-                  });
-                  
-                  // 2. Populate SER-PARTS sheet
+                  // 1. Always Populate SER-PARTS sheet
                   const newSerRow = wsSerParts.addRow([
                     sRowInfo.type, docketVal, desc, invoiceNo, routeVal
                   ]);
@@ -1458,29 +1425,60 @@
                     };
                   });
                   addedSerDockets.add(docketKey);
-                  
-                  // 3. Populate INVOICE sheet
-                  const newInvRow = wsInv.addRow([
-                    platform, docketVal, desc, sRowInfo.cxName, sRowInfo.mobileNumber, sRowInfo.alternateMobileNumber, sRowInfo.address, sRowInfo.pincode, '', invoiceNo, routeVal
-                  ]);
-                  newInvRow.height = 219;
-                  invoiceCount++;
-                  
-                  newInvRow.eachCell((cell) => {
-                    cell.font = { name: 'Calibri', size: 30, bold: true, color: { argb: 'FF000000' } };
-                    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-                    cell.border = {
-                      top: { style: 'thin', color: { argb: 'FF000000' } },
-                      left: { style: 'thin', color: { argb: 'FF000000' } },
-                      bottom: { style: 'thin', color: { argb: 'FF000000' } },
-                      right: { style: 'thin', color: { argb: 'FF000000' } }
-                    };
-                    cell.fill = {
-                      type: 'pattern',
-                      pattern: 'solid',
-                      fgColor: { argb: 'FF00B0F0' } // Sky Blue
-                    };
-                  });
+
+                  // 2. Only Populate ROUTE and INVOICE sheets if route is valid
+                  if (routeVal !== "" && routeVal !== "Not planned") {
+                    const tripId = routeTripMap[routeVal] || '';
+                    
+                    // Populate ROUTE sheet
+                    const newRouteRow = wsRouteOut.addRow([
+                      platform, docketVal, desc, invoiceNo, routeVal, finalTypeVal, '', '', '', tripId
+                    ]);
+                    newRouteRow.height = 14.5;
+                    routeCount++;
+                    
+                    newRouteRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                      cell.font = { name: 'Calibri', size: 11, color: { argb: 'FF000000' } };
+                      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                      cell.border = {
+                        top: { style: 'thin', color: { argb: 'FF000000' } },
+                        left: { style: 'thin', color: { argb: 'FF000000' } },
+                        bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                        right: { style: 'thin', color: { argb: 'FF000000' } }
+                      };
+                      
+                      if (colNumber <= 5) {
+                        cell.fill = {
+                          type: 'pattern',
+                          pattern: 'solid',
+                          fgColor: { argb: 'FF00B0F0' } // Sky Blue
+                        };
+                      }
+                    });
+                    
+                    // Populate INVOICE sheet
+                    const newInvRow = wsInv.addRow([
+                      platform, docketVal, desc, sRowInfo.cxName, sRowInfo.mobileNumber, sRowInfo.alternateMobileNumber, sRowInfo.address, sRowInfo.pincode, '', invoiceNo, routeVal
+                    ]);
+                    newInvRow.height = 219;
+                    invoiceCount++;
+                    
+                    newInvRow.eachCell((cell) => {
+                      cell.font = { name: 'Calibri', size: 30, bold: true, color: { argb: 'FF000000' } };
+                      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                      cell.border = {
+                        top: { style: 'thin', color: { argb: 'FF000000' } },
+                        left: { style: 'thin', color: { argb: 'FF000000' } },
+                        bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                        right: { style: 'thin', color: { argb: 'FF000000' } }
+                      };
+                      cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FF00B0F0' } // Sky Blue
+                      };
+                    });
+                  }
                 });
               }
  

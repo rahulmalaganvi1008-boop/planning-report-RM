@@ -114,7 +114,7 @@ try {
         $routeHeaderRange.Borders.Color = 0
         
         # Set up Column widths for SER-PARTS
-        # Columns: Platform, docket_number, item_sku, invoice_number, Route
+        # Columns: Type, docket_number, item_sku, invoice_number, Route
         $serWidths = @(36.1, 15.6, 39.1, 17.5, 10.9)
         for ($c = 1; $c -le 5; $c++) {
             $wsSerParts.Columns.Item($c).ColumnWidth = $serWidths[$c - 1]
@@ -122,7 +122,7 @@ try {
         $wsSerParts.Columns.Item(4).NumberFormat = "@"
         
         # Setup Headers for SER-PARTS
-        $serHeaders = @("Platform", "docket_number", "item_sku", "invoice_number", "Route")
+        $serHeaders = @("Type", "docket_number", "item_sku", "invoice_number", "Route")
         for ($c = 1; $c -le 5; $c++) {
             $cell = $wsSerParts.Cells(1, $c)
             $cell.Value2 = $serHeaders[$c - 1]
@@ -819,11 +819,6 @@ try {
                         $routeVal = $routeByCust["$cxName|$addr"]
                     }
                     
-                    # If route is empty or "Not planned", do not add to ROUTE, INVOICE, or SER-PARTS
-                    if ($routeVal -eq "" -or $routeVal -eq "Not planned") {
-                        continue
-                    }
-                    
                     # Extract values
                     $platform = $sRowInfo.Service
                     if ($platform -eq "") { $platform = $sRowInfo.Type }
@@ -831,45 +826,7 @@ try {
                     $invoiceNo = $sRowInfo.InvoiceNumber
                     $typeVal = "SER"
                     
-                    # 1. Populate ROUTE sheet
-                    $wsRouteOut.Cells($targetRouteRow, 1).Value2 = $platform
-                    $wsRouteOut.Cells($targetRouteRow, 2).Value2 = $docketVal
-                    $wsRouteOut.Cells($targetRouteRow, 3).Value2 = $desc
-                    $wsRouteOut.Cells($targetRouteRow, 4).Value2 = $invoiceNo
-                    $wsRouteOut.Cells($targetRouteRow, 5).Value2 = $routeVal
-                    $wsRouteOut.Cells($targetRouteRow, 6).Value2 = $typeVal
-                    $wsRouteOut.Cells($targetRouteRow, 7).Value2 = ""
-                    $wsRouteOut.Cells($targetRouteRow, 8).Value2 = ""
-                    $wsRouteOut.Cells($targetRouteRow, 9).Value2 = ""
-                    
-                    $tripId = ""
-                    if ($routeTripMap.ContainsKey($routeVal)) {
-                        $tripId = $routeTripMap[$routeVal]
-                    }
-                    $wsRouteOut.Cells($targetRouteRow, 10).Value2 = $tripId
-                    
-                    $wsRouteOut.Rows.Item($targetRouteRow).RowHeight = 14.5
-                    for ($c = 1; $c -le 10; $c++) {
-                        $cell = $wsRouteOut.Cells($targetRouteRow, $c)
-                        $cell.Font.Name = "Calibri"
-                        $cell.Font.Size = 11
-                        $cell.Font.Bold = $false
-                        $cell.Font.Color = 0
-                        $cell.HorizontalAlignment = -4108
-                        $cell.VerticalAlignment = -4108
-                        $cell.Borders.LineStyle = 1
-                        $cell.Borders.Weight = 2
-                        $cell.Borders.Color = 0
-                        
-                        if ($c -le 5) {
-                            $cell.Interior.Color = 0xF0B000 # Sky Blue
-                        } else {
-                            $cell.Interior.ColorIndex = -4142
-                        }
-                    }
-                    $targetRouteRow++
-                    
-                    # 2. Populate SER-PARTS sheet
+                    # 1. Always Populate SER-PARTS sheet
                     $wsSerParts.Cells($targetSerRow, 1).Value2 = $sRowInfo.Type
                     $wsSerParts.Cells($targetSerRow, 2).Value2 = $docketVal
                     $wsSerParts.Cells($targetSerRow, 3).Value2 = $desc
@@ -892,36 +849,77 @@ try {
                     }
                     $targetSerRow++
                     $addedSerDockets[$docketKey] = $true
-                    
-                    # 3. Populate INVOICE sheet
-                    $wsInv.Cells($targetInvRow, 1).Value2 = $platform
-                    $wsInv.Cells($targetInvRow, 2).Value2 = $docketVal
-                    $wsInv.Cells($targetInvRow, 3).Value2 = $desc
-                    $wsInv.Cells($targetInvRow, 4).Value2 = $sRowInfo.CxName
-                    $wsInv.Cells($targetInvRow, 5).Value2 = $sRowInfo.MobileNumber
-                    $wsInv.Cells($targetInvRow, 6).Value2 = $sRowInfo.AlternateMobileNumber
-                    $wsInv.Cells($targetInvRow, 7).Value2 = $sRowInfo.Address
-                    $wsInv.Cells($targetInvRow, 8).Value2 = $sRowInfo.Pincode
-                    $wsInv.Cells($targetInvRow, 9).Value2 = "" # payType
-                    $wsInv.Cells($targetInvRow, 10).Value2 = $invoiceNo
-                    $wsInv.Cells($targetInvRow, 11).Value2 = $routeVal
-                    
-                    $wsInv.Rows.Item($targetInvRow).RowHeight = 219
-                    for ($c = 1; $c -le 11; $c++) {
-                        $cell = $wsInv.Cells($targetInvRow, $c)
-                        $cell.Font.Name = "Calibri"
-                        $cell.Font.Size = 30
-                        $cell.Font.Bold = $true
-                        $cell.Font.Color = 0
-                        $cell.HorizontalAlignment = -4108
-                        $cell.VerticalAlignment = -4108
-                        $cell.WrapText = $true
-                        $cell.Borders.LineStyle = 1
-                        $cell.Borders.Weight = 2
-                        $cell.Borders.Color = 0
-                        $cell.Interior.Color = 0xF0B000 # Sky Blue
+
+                    # 2. Only Populate ROUTE and INVOICE sheets if route is valid
+                    if ($routeVal -ne "" -and $routeVal -ne "Not planned") {
+                        # Populate ROUTE sheet
+                        $wsRouteOut.Cells($targetRouteRow, 1).Value2 = $platform
+                        $wsRouteOut.Cells($targetRouteRow, 2).Value2 = $docketVal
+                        $wsRouteOut.Cells($targetRouteRow, 3).Value2 = $desc
+                        $wsRouteOut.Cells($targetRouteRow, 4).Value2 = $invoiceNo
+                        $wsRouteOut.Cells($targetRouteRow, 5).Value2 = $routeVal
+                        $wsRouteOut.Cells($targetRouteRow, 6).Value2 = $typeVal
+                        $wsRouteOut.Cells($targetRouteRow, 7).Value2 = ""
+                        $wsRouteOut.Cells($targetRouteRow, 8).Value2 = ""
+                        $wsRouteOut.Cells($targetRouteRow, 9).Value2 = ""
+                        
+                        $tripId = ""
+                        if ($routeTripMap.ContainsKey($routeVal)) {
+                            $tripId = $routeTripMap[$routeVal]
+                        }
+                        $wsRouteOut.Cells($targetRouteRow, 10).Value2 = $tripId
+                        
+                        $wsRouteOut.Rows.Item($targetRouteRow).RowHeight = 14.5
+                        for ($c = 1; $c -le 10; $c++) {
+                            $cell = $wsRouteOut.Cells($targetRouteRow, $c)
+                            $cell.Font.Name = "Calibri"
+                            $cell.Font.Size = 11
+                            $cell.Font.Bold = $false
+                            $cell.Font.Color = 0
+                            $cell.HorizontalAlignment = -4108
+                            $cell.VerticalAlignment = -4108
+                            $cell.Borders.LineStyle = 1
+                            $cell.Borders.Weight = 2
+                            $cell.Borders.Color = 0
+                            
+                            if ($c -le 5) {
+                                $cell.Interior.Color = 0xF0B000 # Sky Blue
+                            } else {
+                                $cell.Interior.ColorIndex = -4142
+                            }
+                        }
+                        $targetRouteRow++
+                        
+                        # Populate INVOICE sheet
+                        $wsInv.Cells($targetInvRow, 1).Value2 = $platform
+                        $wsInv.Cells($targetInvRow, 2).Value2 = $docketVal
+                        $wsInv.Cells($targetInvRow, 3).Value2 = $desc
+                        $wsInv.Cells($targetInvRow, 4).Value2 = $sRowInfo.CxName
+                        $wsInv.Cells($targetInvRow, 5).Value2 = $sRowInfo.MobileNumber
+                        $wsInv.Cells($targetInvRow, 6).Value2 = $sRowInfo.AlternateMobileNumber
+                        $wsInv.Cells($targetInvRow, 7).Value2 = $sRowInfo.Address
+                        $wsInv.Cells($targetInvRow, 8).Value2 = $sRowInfo.Pincode
+                        $wsInv.Cells($targetInvRow, 9).Value2 = "" # payType
+                        $wsInv.Cells($targetInvRow, 10).Value2 = $invoiceNo
+                        $wsInv.Cells($targetInvRow, 11).Value2 = $routeVal
+                        
+                        $wsInv.Rows.Item($targetInvRow).RowHeight = 219
+                        for ($c = 1; $c -le 11; $c++) {
+                            $cell = $wsInv.Cells($targetInvRow, $c)
+                            $cell.Font.Name = "Calibri"
+                            $cell.Font.Size = 30
+                            $cell.Font.Bold = $true
+                            $cell.Font.Color = 0
+                            $cell.HorizontalAlignment = -4108
+                            $cell.VerticalAlignment = -4108
+                            $cell.WrapText = $true
+                            $cell.Borders.LineStyle = 1
+                            $cell.Borders.Weight = 2
+                            $cell.Borders.Color = 0
+                            $cell.Interior.Color = 0xF0B000 # Sky Blue
+                        }
+                        $targetInvRow++
                     }
-                    $targetInvRow++
                 }
             }
         }
