@@ -1073,15 +1073,33 @@
                 const sDocketColIdx = sHeaders['docket_number'] || sHeaders['docket_no'] || 6;
                 const sSkuColIdx = sHeaders['item_sku'] || 4;
                 const sInvoiceColIdx = sHeaders['invoice_number'] || sHeaders['invoice_no'] || 5;
+                const sOrderIdColIdx = sHeaders['order_random_id'] || 3;
+                const sCxNameColIdx = sHeaders['cx_name'] || 7;
+                const sAddressColIdx = sHeaders['address'] || 8;
+                const sPincodeColIdx = sHeaders['pincode'] || 9;
+                const sMobileColIdx = sHeaders['mobile_number'] || 10;
+                const sAltMobileColIdx = sHeaders['alternate_mobile_number'] || 11;
+                const sRemarksColIdx = sHeaders['remarks'] || 12;
+                const sServiceColIdx = sHeaders['service'] || 2;
 
                 wsServiceSrc.eachRow((row, rowNumber) => {
                   if (rowNumber === 1) return;
                   const docketVal = getCellText(row.getCell(sDocketColIdx)).toUpperCase();
                   if (docketVal) {
+                    const isBlue = isBlueColor(row.getCell(1)) || isBlueColor(row.getCell(sDocketColIdx));
                     serviceSheetRows[docketVal] = {
                       type: getCellText(row.getCell(sTypeColIdx)),
                       sku: getCellText(row.getCell(sSkuColIdx)),
-                      invoice: getCellText(row.getCell(sInvoiceColIdx))
+                      invoice: getCellText(row.getCell(sInvoiceColIdx)),
+                      isBlue: isBlue,
+                      orderRandomId: getCellText(row.getCell(sOrderIdColIdx)),
+                      cxName: getCellText(row.getCell(sCxNameColIdx)),
+                      address: getCellText(row.getCell(sAddressColIdx)),
+                      pincode: getCellText(row.getCell(sPincodeColIdx)),
+                      mobileNumber: getCellText(row.getCell(sMobileColIdx)),
+                      alternateMobileNumber: getCellText(row.getCell(sAltMobileColIdx)),
+                      remarks: getCellText(row.getCell(sRemarksColIdx)),
+                      service: getCellText(row.getCell(sServiceColIdx))
                     };
                   }
                 });
@@ -1093,6 +1111,12 @@
               const routeTripMap = {};
               const docketRouteMap = {};
               const addedSerDockets = new Set();
+              
+              const routeByOrderId = {};
+              const routeByDocket = {};
+              const routeByCust = {};
+              const orderIdCol = headers['order_random_id'] || 2;
+
               for (let r = 2; r <= routeRowsCount; r++) {
                 const routeRow = wsRoute.getRow(r);
                 const routeVal = getCellText(routeRow.getCell(routeCol));
@@ -1107,8 +1131,19 @@
                   addrCounts[address] = (addrCounts[address] || 0) + 1;
                 }
 
-                // Map Route to Trip Number if docket is in tripIdMap
+                const orderId = getCellText(routeRow.getCell(orderIdCol)).trim().toUpperCase();
                 const docketVal = getCellText(routeRow.getCell(docketCol)).toUpperCase();
+                if (orderId) {
+                  routeByOrderId[orderId] = routeVal;
+                }
+                if (docketVal) {
+                  routeByDocket[docketVal] = routeVal;
+                }
+                if (cxName && address) {
+                  routeByCust[cxName.trim() + '|' + address.trim()] = routeVal;
+                }
+
+                // Map Route to Trip Number if docket is in tripIdMap
                 if (tripIdMap[docketVal]) {
                   routeTripMap[routeVal] = tripIdMap[docketVal];
                 }
@@ -1158,7 +1193,7 @@
                   const stdPlats = ['wakefit', 'wakefit_retail', 'amazon', 'flipkart', 'offline'];
                   const isServicePart = !stdPlats.includes(plat) && plat !== '';
                   const isServiceRoute = routeVal.toLowerCase().includes('ser');
-                  const isServiceFromSheet = !!serviceSheetRows[docket.toUpperCase()];
+                  const isServiceFromSheet = !!(serviceSheetRows[docket.toUpperCase()] && serviceSheetRows[docket.toUpperCase()].isBlue);
                   const isBlue = isBlueColor(sourcePlatCell);
                   return isServicePart || isServiceRoute || isServiceFromSheet || isBlue;
                 })();
@@ -1327,7 +1362,7 @@
                 });
               }
 
-              // Populate SER-PARTS sheet from Service sheet data using mapped routes (remaining unmatched items)
+              // Second pass: process missing blue service dockets from the Service sheet
               if (wsServiceSrc) {
                 const sHeaderRow = wsServiceSrc.getRow(1);
                 const sHeaders = {};
@@ -1339,38 +1374,113 @@
                   }
                 });
 
-                const sTypeColIdx = sHeaders['type'] || sHeaders['ty'] || 1;
                 const sDocketColIdx = sHeaders['docket_number'] || sHeaders['docket_no'] || 6;
-                const sSkuColIdx = sHeaders['item_sku'] || 4;
-                const sInvoiceColIdx = sHeaders['invoice_number'] || sHeaders['invoice_no'] || 5;
 
                 wsServiceSrc.eachRow((row, rowNumber) => {
                   if (rowNumber === 1) return;
-                  const docketVal = getCellText(row.getCell(sDocketColIdx));
+                  const docketVal = getCellText(row.getCell(sDocketColIdx)).trim();
                   const docketKey = docketVal.toUpperCase();
-                  if (docketKey && docketRouteMap[docketKey] && !addedSerDockets.has(docketKey)) {
-                    const routeVal = docketRouteMap[docketKey];
-                    const typeVal = getCellText(row.getCell(sTypeColIdx));
-                    const skuVal = getCellText(row.getCell(sSkuColIdx));
-                    const invoiceVal = getCellText(row.getCell(sInvoiceColIdx));
-
-                    const newSerRow = wsSerParts.addRow([
-                      typeVal, docketVal, skuVal, invoiceVal, routeVal
-                    ]);
-                    newSerRow.height = 14.5;
-                    serPartsCount++;
-                    newSerRow.eachCell((cell) => {
-                      cell.font = { name: 'Calibri', size: 11, bold: false, color: { argb: 'FF000000' } };
-                      cell.alignment = { horizontal: 'center', vertical: 'middle' };
-                      cell.border = {
-                        top: { style: 'thin', color: { argb: 'FF000000' } },
-                        left: { style: 'thin', color: { argb: 'FF000000' } },
-                        bottom: { style: 'thin', color: { argb: 'FF000000' } },
-                        right: { style: 'thin', color: { argb: 'FF000000' } }
-                      };
-                    });
-                    addedSerDockets.add(docketKey);
+                  if (!docketKey) return;
+                  
+                  // Check if already processed
+                  if (addedSerDockets.has(docketKey)) return;
+                  
+                  // Check if blue
+                  const sRowInfo = serviceSheetRows[docketKey];
+                  if (!sRowInfo || !sRowInfo.isBlue) return;
+                  
+                  // Determine route
+                  const orderId = sRowInfo.orderRandomId.trim().toUpperCase();
+                  const cxName = sRowInfo.cxName.trim().toLowerCase();
+                  const addr = sRowInfo.address.trim().toLowerCase();
+                  
+                  let routeVal = '';
+                  if (orderId && routeByOrderId[orderId]) {
+                    routeVal = routeByOrderId[orderId];
+                  } else if (routeByDocket[docketKey]) {
+                    routeVal = routeByDocket[docketKey];
+                  } else if (cxName && addr && routeByCust[cxName + '|' + addr]) {
+                    routeVal = routeByCust[cxName + '|' + addr];
                   }
+                  
+                  // If route is empty or "Not planned", do not add to ROUTE, INVOICE, or SER-PARTS
+                  if (routeVal === "" || routeVal === "Not planned") {
+                    return;
+                  }
+                  
+                  let platform = sRowInfo.service || sRowInfo.type;
+                  let desc = sRowInfo.sku;
+                  let invoiceNo = sRowInfo.invoice;
+                  let finalTypeVal = "SER";
+                  
+                  const tripId = routeTripMap[routeVal] || '';
+                  
+                  // 1. Populate ROUTE sheet
+                  const newRouteRow = wsRouteOut.addRow([
+                    platform, docketVal, desc, invoiceNo, routeVal, finalTypeVal, '', '', '', tripId
+                  ]);
+                  newRouteRow.height = 14.5;
+                  routeCount++;
+                  
+                  newRouteRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                    cell.font = { name: 'Calibri', size: 11, color: { argb: 'FF000000' } };
+                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                    cell.border = {
+                      top: { style: 'thin', color: { argb: 'FF000000' } },
+                      left: { style: 'thin', color: { argb: 'FF000000' } },
+                      bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                      right: { style: 'thin', color: { argb: 'FF000000' } }
+                    };
+                    
+                    if (colNumber <= 5) {
+                      cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FF00B0F0' } // Sky Blue
+                      };
+                    }
+                  });
+                  
+                  // 2. Populate SER-PARTS sheet
+                  const newSerRow = wsSerParts.addRow([
+                    sRowInfo.type, docketVal, desc, invoiceNo, routeVal
+                  ]);
+                  newSerRow.height = 14.5;
+                  serPartsCount++;
+                  newSerRow.eachCell((cell) => {
+                    cell.font = { name: 'Calibri', size: 11, bold: false, color: { argb: 'FF000000' } };
+                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                    cell.border = {
+                      top: { style: 'thin', color: { argb: 'FF000000' } },
+                      left: { style: 'thin', color: { argb: 'FF000000' } },
+                      bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                      right: { style: 'thin', color: { argb: 'FF000000' } }
+                    };
+                  });
+                  addedSerDockets.add(docketKey);
+                  
+                  // 3. Populate INVOICE sheet
+                  const newInvRow = wsInv.addRow([
+                    platform, docketVal, desc, sRowInfo.cxName, sRowInfo.mobileNumber, sRowInfo.alternateMobileNumber, sRowInfo.address, sRowInfo.pincode, '', invoiceNo, routeVal
+                  ]);
+                  newInvRow.height = 219;
+                  invoiceCount++;
+                  
+                  newInvRow.eachCell((cell) => {
+                    cell.font = { name: 'Calibri', size: 30, bold: true, color: { argb: 'FF000000' } };
+                    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                    cell.border = {
+                      top: { style: 'thin', color: { argb: 'FF000000' } },
+                      left: { style: 'thin', color: { argb: 'FF000000' } },
+                      bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                      right: { style: 'thin', color: { argb: 'FF000000' } }
+                    };
+                    cell.fill = {
+                      type: 'pattern',
+                      pattern: 'solid',
+                      fgColor: { argb: 'FF00B0F0' } // Sky Blue
+                    };
+                  });
                 });
               }
  

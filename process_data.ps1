@@ -442,6 +442,15 @@ try {
             $sSkuColIdx = if ($sHeaders.ContainsKey("item_sku")) { $sHeaders["item_sku"] } else { 4 }
             $sInvoiceColIdx = if ($sHeaders.ContainsKey("invoice_number")) { $sHeaders["invoice_number"] } elseif ($sHeaders.ContainsKey("invoice_no")) { $sHeaders["invoice_no"] } else { 5 }
             
+            $sOrderIdColIdx = if ($sHeaders.ContainsKey("order_random_id")) { $sHeaders["order_random_id"] } else { 3 }
+            $sCxNameColIdx = if ($sHeaders.ContainsKey("cx_name")) { $sHeaders["cx_name"] } else { 7 }
+            $sAddressColIdx = if ($sHeaders.ContainsKey("address")) { $sHeaders["address"] } else { 8 }
+            $sPincodeColIdx = if ($sHeaders.ContainsKey("pincode")) { $sHeaders["pincode"] } else { 9 }
+            $sMobileColIdx = if ($sHeaders.ContainsKey("mobile_number")) { $sHeaders["mobile_number"] } else { 10 }
+            $sAltMobileColIdx = if ($sHeaders.ContainsKey("alternate_mobile_number")) { $sHeaders["alternate_mobile_number"] } else { 11 }
+            $sRemarksColIdx = if ($sHeaders.ContainsKey("remarks")) { $sHeaders["remarks"] } else { 12 }
+            $sServiceColIdx = if ($sHeaders.ContainsKey("service")) { $sHeaders["service"] } else { 2 }
+
             for ($sr = 2; $sr -le $sRows; $sr++) {
                 $docketVal = $wsServiceSrc.Cells($sr, $sDocketColIdx).Text.Trim().ToUpper()
                 if ($docketVal -ne "") {
@@ -449,10 +458,40 @@ try {
                     $skuVal = $wsServiceSrc.Cells($sr, $sSkuColIdx).Text.Trim()
                     $invoiceVal = $wsServiceSrc.Cells($sr, $sInvoiceColIdx).Text.Trim()
                     
+                    $cell1 = $wsServiceSrc.Cells($sr, 1)
+                    $sColor1 = $cell1.Interior.Color
+                    $sColor1Idx = $cell1.Interior.ColorIndex
+                    $isBlue1 = ($sColor1 -eq 15773696 -or $sColor1Idx -eq 33 -or $sColor1Idx -eq 34 -or $sColor1Idx -eq 41 -or $sColor1Idx -eq 42 -or ($sColor1 -eq 16773632) -or ($sColor1 -eq 16777164))
+
+                    $cellDoc = $wsServiceSrc.Cells($sr, $sDocketColIdx)
+                    $sColorDoc = $cellDoc.Interior.Color
+                    $sColorDocIdx = $cellDoc.Interior.ColorIndex
+                    $isBlueDoc = ($sColorDoc -eq 15773696 -or $sColorDocIdx -eq 33 -or $sColorDocIdx -eq 34 -or $sColorDocIdx -eq 41 -or $sColorDocIdx -eq 42 -or ($sColorDoc -eq 16773632) -or ($sColorDoc -eq 16777164))
+
+                    $isRowBlue = ($isBlue1 -or $isBlueDoc)
+
+                    $orderIdVal = $wsServiceSrc.Cells($sr, $sOrderIdColIdx).Text.Trim()
+                    $cxNameVal = $wsServiceSrc.Cells($sr, $sCxNameColIdx).Text.Trim()
+                    $addressVal = $wsServiceSrc.Cells($sr, $sAddressColIdx).Text.Trim()
+                    $pincodeVal = $wsServiceSrc.Cells($sr, $sPincodeColIdx).Text.Trim()
+                    $mobileVal = $wsServiceSrc.Cells($sr, $sMobileColIdx).Text.Trim()
+                    $altMobileVal = $wsServiceSrc.Cells($sr, $sAltMobileColIdx).Text.Trim()
+                    $remarksVal = $wsServiceSrc.Cells($sr, $sRemarksColIdx).Text.Trim()
+                    $serviceVal = $wsServiceSrc.Cells($sr, $sServiceColIdx).Text.Trim()
+
                     $serviceSheetRows[$docketVal] = [PSCustomObject]@{
-                        Type          = $typeVal
-                        ItemSku       = $skuVal
-                        InvoiceNumber = $invoiceVal
+                        Type                   = $typeVal
+                        ItemSku                = $skuVal
+                        InvoiceNumber          = $invoiceVal
+                        IsBlue                 = $isRowBlue
+                        OrderRandomId          = $orderIdVal
+                        CxName                 = $cxNameVal
+                        Address                = $addressVal
+                        Pincode                = $pincodeVal
+                        MobileNumber           = $mobileVal
+                        AlternateMobileNumber  = $altMobileVal
+                        Remarks                = $remarksVal
+                        Service                = $serviceVal
                     }
                 }
             }
@@ -466,6 +505,11 @@ try {
         $addrCounts   = @{}
         $routeTripMap = @{}
         $docketRouteMap = @{}
+
+        $routeByOrderId = @{}
+        $routeByDocket = @{}
+        $routeByCust = @{}
+        $orderIdCol = if ($headers.ContainsKey("order_random_id")) { $headers["order_random_id"] } else { 2 }
         
         for ($r = 2; $r -le $routeRows; $r++) {
             $routeVal = $wsRoute.Cells($r, $routeCol).Text.Trim()
@@ -480,8 +524,19 @@ try {
                 $addrCounts[$addr]++
             }
 
-            # Map Route to Trip Number if docket is in tripIdMap
+            $orderId = $wsRoute.Cells($r, $orderIdCol).Text.Trim().ToUpper()
             $docketVal = $wsRoute.Cells($r, $docketCol).Text.Trim().ToUpper()
+            if ($orderId -ne "") {
+                $routeByOrderId[$orderId] = $routeVal
+            }
+            if ($docketVal -ne "") {
+                $routeByDocket[$docketVal] = $routeVal
+            }
+            if ($cxName -ne "" -and $addr -ne "") {
+                $routeByCust["$cxName|$addr"] = $routeVal
+            }
+
+            # Map Route to Trip Number if docket is in tripIdMap
             if ($tripIdMap.ContainsKey($docketVal)) {
                 $tId = $tripIdMap[$docketVal]
                 if ($tId -ne "") {
@@ -540,7 +595,7 @@ try {
             $platLower = $platform.ToLower().Trim()
             $isServicePart = ($platLower -ne "" -and $platLower -ne "wakefit" -and $platLower -ne "wakefit_retail" -and $platLower -ne "amazon" -and $platLower -ne "flipkart" -and $platLower -ne "offline")
             $isServiceRoute = ($routeVal -like "*Ser*" -or $routeVal -like "*Service*")
-            $isServiceFromSheet = $serviceSheetRows.ContainsKey($docket.ToUpper())
+            $isServiceFromSheet = ($serviceSheetRows.ContainsKey($docket.ToUpper()) -and $serviceSheetRows[$docket.ToUpper()].IsBlue)
             $isBlueColor = ($sourceColor -eq 15773696 -or $sourceColorIdx -eq 33 -or $sourceColorIdx -eq 34 -or $sourceColorIdx -eq 41 -or $sourceColorIdx -eq 42 -or ($sourceColor -eq 16773632) -or ($sourceColor -eq 16777164))
             $isService = ($isServicePart -or $isServiceRoute -or $isServiceFromSheet -or $isBlueColor)
             
@@ -732,21 +787,93 @@ try {
         }
         Write-Host "TRIP ID sheet populated with $(($targetTripRow - 2)) unique routes."
 
-        # Populate SER-PARTS sheet from Service sheet data using mapped routes (remaining unmatched items)
+        # Second pass: Process missing blue service dockets from the Service sheet
         if ($null -ne $wsServiceSrc) {
             for ($sr = 2; $sr -le $sRows; $sr++) {
                 $docketVal = $wsServiceSrc.Cells($sr, $sDocketColIdx).Text.Trim()
                 $docketKey = $docketVal.ToUpper()
-                if ($docketKey -ne "" -and $docketRouteMap.ContainsKey($docketKey) -and -not $addedSerDockets.ContainsKey($docketKey)) {
-                    $routeVal = $docketRouteMap[$docketKey]
-                    $typeVal = $wsServiceSrc.Cells($sr, $sTypeColIdx).Text.Trim()
-                    $skuVal = $wsServiceSrc.Cells($sr, $sSkuColIdx).Text.Trim()
-                    $invoiceVal = $wsServiceSrc.Cells($sr, $sInvoiceColIdx).Text.Trim()
+                
+                if ($docketKey -ne "") {
+                    # Check if it was already processed in the first pass
+                    if ($addedSerDockets.ContainsKey($docketKey)) {
+                        continue
+                    }
                     
-                    $wsSerParts.Cells($targetSerRow, 1).Value2 = $typeVal
+                    # Check if it is blue in the Service sheet
+                    $sRowInfo = $serviceSheetRows[$docketKey]
+                    if ($null -eq $sRowInfo -or -not $sRowInfo.IsBlue) {
+                        continue
+                    }
+                    
+                    # Determine route
+                    $orderId = $sRowInfo.OrderRandomId.ToUpper()
+                    $cxName = $sRowInfo.CxName.ToLower()
+                    $addr = $sRowInfo.Address.ToLower()
+                    
+                    $routeVal = ""
+                    if ($orderId -ne "" -and $routeByOrderId.ContainsKey($orderId)) {
+                        $routeVal = $routeByOrderId[$orderId]
+                    } elseif ($routeByDocket.ContainsKey($docketKey)) {
+                        $routeVal = $routeByDocket[$docketKey]
+                    } elseif ($cxName -ne "" -and $addr -ne "" -and $routeByCust.ContainsKey("$cxName|$addr")) {
+                        $routeVal = $routeByCust["$cxName|$addr"]
+                    }
+                    
+                    # If route is empty or "Not planned", do not add to ROUTE, INVOICE, or SER-PARTS
+                    if ($routeVal -eq "" -or $routeVal -eq "Not planned") {
+                        continue
+                    }
+                    
+                    # Extract values
+                    $platform = $sRowInfo.Service
+                    if ($platform -eq "") { $platform = $sRowInfo.Type }
+                    $desc = $sRowInfo.ItemSku
+                    $invoiceNo = $sRowInfo.InvoiceNumber
+                    $typeVal = "SER"
+                    
+                    # 1. Populate ROUTE sheet
+                    $wsRouteOut.Cells($targetRouteRow, 1).Value2 = $platform
+                    $wsRouteOut.Cells($targetRouteRow, 2).Value2 = $docketVal
+                    $wsRouteOut.Cells($targetRouteRow, 3).Value2 = $desc
+                    $wsRouteOut.Cells($targetRouteRow, 4).Value2 = $invoiceNo
+                    $wsRouteOut.Cells($targetRouteRow, 5).Value2 = $routeVal
+                    $wsRouteOut.Cells($targetRouteRow, 6).Value2 = $typeVal
+                    $wsRouteOut.Cells($targetRouteRow, 7).Value2 = ""
+                    $wsRouteOut.Cells($targetRouteRow, 8).Value2 = ""
+                    $wsRouteOut.Cells($targetRouteRow, 9).Value2 = ""
+                    
+                    $tripId = ""
+                    if ($routeTripMap.ContainsKey($routeVal)) {
+                        $tripId = $routeTripMap[$routeVal]
+                    }
+                    $wsRouteOut.Cells($targetRouteRow, 10).Value2 = $tripId
+                    
+                    $wsRouteOut.Rows.Item($targetRouteRow).RowHeight = 14.5
+                    for ($c = 1; $c -le 10; $c++) {
+                        $cell = $wsRouteOut.Cells($targetRouteRow, $c)
+                        $cell.Font.Name = "Calibri"
+                        $cell.Font.Size = 11
+                        $cell.Font.Bold = $false
+                        $cell.Font.Color = 0
+                        $cell.HorizontalAlignment = -4108
+                        $cell.VerticalAlignment = -4108
+                        $cell.Borders.LineStyle = 1
+                        $cell.Borders.Weight = 2
+                        $cell.Borders.Color = 0
+                        
+                        if ($c -le 5) {
+                            $cell.Interior.Color = 0xF0B000 # Sky Blue
+                        } else {
+                            $cell.Interior.ColorIndex = -4142
+                        }
+                    }
+                    $targetRouteRow++
+                    
+                    # 2. Populate SER-PARTS sheet
+                    $wsSerParts.Cells($targetSerRow, 1).Value2 = $sRowInfo.Type
                     $wsSerParts.Cells($targetSerRow, 2).Value2 = $docketVal
-                    $wsSerParts.Cells($targetSerRow, 3).Value2 = $skuVal
-                    $wsSerParts.Cells($targetSerRow, 4).Value2 = $invoiceVal
+                    $wsSerParts.Cells($targetSerRow, 3).Value2 = $desc
+                    $wsSerParts.Cells($targetSerRow, 4).Value2 = $invoiceNo
                     $wsSerParts.Cells($targetSerRow, 5).Value2 = $routeVal
                     
                     $wsSerParts.Rows.Item($targetSerRow).RowHeight = 14.5
@@ -758,7 +885,6 @@ try {
                         $cell.Font.Color = 0
                         $cell.HorizontalAlignment = -4108
                         $cell.VerticalAlignment = -4108
-                        
                         $cell.Borders.LineStyle = 1
                         $cell.Borders.Weight = 2
                         $cell.Borders.Color = 0
@@ -766,6 +892,36 @@ try {
                     }
                     $targetSerRow++
                     $addedSerDockets[$docketKey] = $true
+                    
+                    # 3. Populate INVOICE sheet
+                    $wsInv.Cells($targetInvRow, 1).Value2 = $platform
+                    $wsInv.Cells($targetInvRow, 2).Value2 = $docketVal
+                    $wsInv.Cells($targetInvRow, 3).Value2 = $desc
+                    $wsInv.Cells($targetInvRow, 4).Value2 = $sRowInfo.CxName
+                    $wsInv.Cells($targetInvRow, 5).Value2 = $sRowInfo.MobileNumber
+                    $wsInv.Cells($targetInvRow, 6).Value2 = $sRowInfo.AlternateMobileNumber
+                    $wsInv.Cells($targetInvRow, 7).Value2 = $sRowInfo.Address
+                    $wsInv.Cells($targetInvRow, 8).Value2 = $sRowInfo.Pincode
+                    $wsInv.Cells($targetInvRow, 9).Value2 = "" # payType
+                    $wsInv.Cells($targetInvRow, 10).Value2 = $invoiceNo
+                    $wsInv.Cells($targetInvRow, 11).Value2 = $routeVal
+                    
+                    $wsInv.Rows.Item($targetInvRow).RowHeight = 219
+                    for ($c = 1; $c -le 11; $c++) {
+                        $cell = $wsInv.Cells($targetInvRow, $c)
+                        $cell.Font.Name = "Calibri"
+                        $cell.Font.Size = 30
+                        $cell.Font.Bold = $true
+                        $cell.Font.Color = 0
+                        $cell.HorizontalAlignment = -4108
+                        $cell.VerticalAlignment = -4108
+                        $cell.WrapText = $true
+                        $cell.Borders.LineStyle = 1
+                        $cell.Borders.Weight = 2
+                        $cell.Borders.Color = 0
+                        $cell.Interior.Color = 0xF0B000 # Sky Blue
+                    }
+                    $targetInvRow++
                 }
             }
         }
