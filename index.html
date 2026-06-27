@@ -1499,10 +1499,7 @@
               
               progressBar.style.width = '100%';
               progressContainer.style.display = 'none';
-              showMessage(`✅ Downloaded ${outputFileName}! (INVOICE: ${invoiceCount} rows, SER-PARTS: ${serPartsCount} rows, ROUTE: ${routeCount} rows) — Resetting in 2 seconds...`, 'success');
-              
-              // Auto-reset after 2 seconds so user can upload a new file without refreshing
-              setTimeout(() => resetDashboard(), 2000);
+              showMessage(`Successfully generated sheets (INVOICE: ${invoiceCount} rows, SER-PARTS: ${serPartsCount} rows, ROUTE: ${routeCount} rows) and downloaded ${outputFileName}!`, 'success');
             }
           } catch (err) {
             console.error(err);
@@ -1527,37 +1524,6 @@
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    }
-
-    function resetDashboard() {
-      // Reset state variables
-      currentFile = null;
-      isData1 = false;
-      tripIdMap = {};
-      picklistMap = {};
-
-      // Reset main file upload UI
-      fileInput.value = '';
-      fileDetails.style.display = 'none';
-      actionPanel.style.display = 'none';
-      progressContainer.style.display = 'none';
-      dropText.textContent = 'Choose Route Planning file or drag it here';
-      dropZone.classList.remove('dragover');
-
-      // Reset Trip ID upload UI
-      tripFileInput.value = '';
-      tripDropText.textContent = 'Upload Trip Number file here';
-      tripDropZone.classList.remove('dragover', 'loaded');
-      tripStatus.style.display = 'none';
-
-      // Reset Picklist upload UI
-      picklistFileInput.value = '';
-      picklistDropText.textContent = 'Upload Picklist file here';
-      picklistDropZone.classList.remove('dragover', 'loaded');
-      picklistStatus.style.display = 'none';
-
-      // Clear any success/error messages
-      hideMessage();
     }
   </script>
 </body>
