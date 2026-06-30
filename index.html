@@ -889,15 +889,29 @@
               const wsTrip   = workbook.addWorksheet('TRIP ID');
               const wsInv    = workbook.addWorksheet('INVOICE');
               
-              // Place them before Response sheet in order: ROUTE, SER-PARTS, TRIP ID, INVOICE
+              let wsPicklist = null;
+              if (picklistRawRows.length > 0) {
+                wsPicklist = workbook.addWorksheet('Picklist');
+              }
+              
+              // Place them before Response sheet in order: ROUTE, SER-PARTS, TRIP ID, INVOICE, Picklist
               const sheets = workbook.worksheets;
               const responseIdx = sheets.findIndex(s => s.name === 'Response');
               if (responseIdx !== -1) {
+                let addedPicklist = null;
+                if (wsPicklist) {
+                  addedPicklist = sheets.pop();
+                }
                 const addedInv      = sheets.pop();
                 const addedTrip     = sheets.pop();
                 const addedSerParts = sheets.pop();
                 const addedRouteOut = sheets.pop();
-                sheets.splice(responseIdx, 0, addedRouteOut, addedSerParts, addedTrip, addedInv);
+                
+                if (addedPicklist) {
+                  sheets.splice(responseIdx, 0, addedRouteOut, addedSerParts, addedTrip, addedInv, addedPicklist);
+                } else {
+                  sheets.splice(responseIdx, 0, addedRouteOut, addedSerParts, addedTrip, addedInv);
+                }
                 workbook._worksheets = sheets;
               }
               
@@ -1508,10 +1522,8 @@
               wsTrip.views     = [{ showGridLines: true }];
               wsRouteOut.views = [{ showGridLines: true }];
 
-              // Add Picklist sheet if a picklist file was uploaded
-              let wsPicklist = null;
-              if (picklistRawRows.length > 0) {
-                wsPicklist = workbook.addWorksheet('Picklist');
+              // Populate Picklist sheet if a picklist file was uploaded
+              if (wsPicklist && picklistRawRows.length > 0) {
                 const [plHeaders, ...plDataRows] = picklistRawRows;
 
                 // Set column widths based on header count
