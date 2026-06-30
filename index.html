@@ -10,19 +10,20 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  
-  <style>
+   <style>
     :root {
-      --bg-color: #0b0f19;
-      --card-bg: rgba(20, 28, 47, 0.6);
-      --card-border: rgba(255, 255, 255, 0.08);
-      --text-main: #f3f4f6;
-      --text-sub: #9ca3af;
+      --bg-color: #080c14;
+      --card-bg: rgba(13, 20, 38, 0.5);
+      --card-border: rgba(255, 255, 255, 0.06);
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
       --primary: #10b981; /* Emerald */
       --primary-hover: #059669;
+      --primary-glow: rgba(16, 185, 129, 0.2);
       --accent: #06b6d4; /* Cyan */
-      --glow-color: rgba(16, 185, 129, 0.15);
+      --accent-glow: rgba(6, 182, 212, 0.25);
       --error: #ef4444;
+      --panel-bg: rgba(30, 41, 59, 0.2);
     }
 
     * {
@@ -41,163 +42,281 @@
       align-items: center;
       justify-content: center;
       padding: 2rem;
+      position: relative;
+      overflow-x: hidden;
+      /* Glowing grid background */
       background-image: 
-        radial-gradient(at 0% 0%, rgba(6, 182, 212, 0.1) 0px, transparent 50%),
-        radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.1) 0px, transparent 50%);
+        radial-gradient(at 0% 0%, rgba(6, 182, 212, 0.15) 0px, transparent 40%),
+        radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.15) 0px, transparent 40%),
+        linear-gradient(rgba(255, 255, 255, 0.01) 1px, transparent 1px), 
+        linear-gradient(90deg, rgba(255, 255, 255, 0.01) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 30px 30px, 30px 30px;
+    }
+
+    /* Floating glowing orbs in background */
+    body::before, body::after {
+      content: '';
+      position: absolute;
+      width: 400px;
+      height: 400px;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.15;
+      z-index: -1;
+      pointer-events: none;
+    }
+    body::before {
+      top: 15%;
+      left: 10%;
+      background: var(--accent);
+    }
+    body::after {
+      bottom: 15%;
+      right: 10%;
+      background: var(--primary);
     }
 
     .container {
       width: 100%;
-      max-width: 650px;
+      max-width: 960px;
       background: var(--card-bg);
       border: 1px solid var(--card-border);
-      backdrop-filter: blur(16px) saturate(180%);
-      border-radius: 24px;
-      padding: 2.5rem;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 0 50px var(--glow-color);
+      backdrop-filter: blur(24px) saturate(190%);
+      -webkit-backdrop-filter: blur(24px) saturate(190%);
+      border-radius: 28px;
+      padding: 3rem;
+      box-shadow: 
+        0 4px 30px rgba(0, 0, 0, 0.2),
+        0 24px 60px rgba(0, 0, 0, 0.4),
+        inset 0 1px 1px rgba(255, 255, 255, 0.05);
       display: flex;
       flex-direction: column;
-      gap: 2rem;
+      gap: 2.25rem;
     }
 
     header {
-      text-align: center;
       display: flex;
       flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+      text-align: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 1.75rem;
+    }
+
+    .app-status {
+      display: inline-flex;
+      align-items: center;
       gap: 0.5rem;
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      border-radius: 9999px;
+      padding: 0.35rem 0.85rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      color: var(--primary);
+      text-transform: uppercase;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      background-color: var(--primary);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--primary);
+      animation: pulse 1.8s infinite;
     }
 
     h1 {
-      font-size: 2.25rem;
+      font-size: 2.4rem;
       font-weight: 700;
-      background: linear-gradient(135deg, var(--text-main) 30%, var(--accent));
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #ffffff 40%, var(--accent));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      letter-spacing: -0.02em;
+      margin-top: 0.25rem;
     }
 
     p.subtitle {
       color: var(--text-sub);
-      font-size: 1rem;
+      font-size: 1.05rem;
       font-weight: 400;
+      max-width: 600px;
+    }
+
+    /* Grid Layout for dashboard */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 2rem;
+    }
+
+    @media (max-width: 820px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .section-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 20px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+    }
+
+    .trip-section-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .trip-section-label.emerald-label {
+      color: var(--primary);
     }
 
     /* Drop Zone styling */
     .drop-zone {
-      border: 2px dashed rgba(255, 255, 255, 0.15);
+      border: 2px dashed rgba(255, 255, 255, 0.12);
       border-radius: 16px;
-      padding: 3.5rem 2rem;
+      padding: 3rem 2rem;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       gap: 1rem;
       cursor: pointer;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      background: rgba(255, 255, 255, 0.02);
+      transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+      background: rgba(255, 255, 255, 0.01);
+      position: relative;
+      overflow: hidden;
     }
 
     .drop-zone:hover, .drop-zone.dragover {
       border-color: var(--primary);
-      background: rgba(16, 185, 129, 0.05);
-      box-shadow: 0 0 20px rgba(16, 185, 129, 0.1) inset;
+      background: rgba(16, 185, 129, 0.04);
+      box-shadow: 0 0 24px rgba(16, 185, 129, 0.08) inset, 0 8px 24px rgba(16, 185, 129, 0.04);
+      transform: translateY(-2px);
     }
 
-    /* Trip ID drop zone — accent colour scheme */
     .drop-zone-trip {
-      border: 2px dashed rgba(6, 182, 212, 0.35);
+      border: 2px dashed rgba(255, 255, 255, 0.12);
       border-radius: 16px;
-      padding: 2rem 2rem;
+      padding: 1.8rem 1.5rem;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       gap: 0.75rem;
       cursor: pointer;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      background: rgba(6, 182, 212, 0.04);
+      transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+      background: rgba(255, 255, 255, 0.01);
+      position: relative;
     }
 
-    .drop-zone-trip:hover, .drop-zone-trip.dragover {
+    .drop-zone-trip.trip-accent:hover, .drop-zone-trip.trip-accent.dragover {
       border-color: var(--accent);
-      background: rgba(6, 182, 212, 0.08);
-      box-shadow: 0 0 20px rgba(6, 182, 212, 0.1) inset;
+      background: rgba(6, 182, 212, 0.04);
+      box-shadow: 0 0 24px rgba(6, 182, 212, 0.08) inset, 0 8px 24px rgba(6, 182, 212, 0.04);
+      transform: translateY(-2px);
     }
 
-    .trip-section-label {
-      font-size: 0.78rem;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 0.25rem;
+    .drop-zone-trip.picklist-accent:hover, .drop-zone-trip.picklist-accent.dragover {
+      border-color: var(--primary);
+      background: rgba(16, 185, 129, 0.04);
+      box-shadow: 0 0 24px rgba(16, 185, 129, 0.08) inset, 0 8px 24px rgba(16, 185, 129, 0.04);
+      transform: translateY(-2px);
     }
 
-    .trip-status {
-      display: none;
-      align-items: center;
-      gap: 0.6rem;
-      font-size: 0.88rem;
-      color: var(--accent);
-      background: rgba(6, 182, 212, 0.08);
-      border: 1px solid rgba(6, 182, 212, 0.2);
-      border-radius: 10px;
-      padding: 0.6rem 1rem;
-      margin-top: 0.25rem;
+    .drop-icon-svg {
+      width: 44px;
+      height: 44px;
+      fill: none;
+      stroke: var(--text-sub);
+      stroke-width: 1.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: all 0.3s;
     }
 
-    .trip-status.visible { display: flex; }
-
-    .drop-icon {
-      font-size: 3rem;
-      color: var(--text-sub);
-      transition: color 0.3s;
+    .drop-zone:hover .drop-icon-svg, .drop-zone.dragover .drop-icon-svg {
+      stroke: var(--primary);
+      filter: drop-shadow(0 0 8px var(--primary-glow));
+      transform: scale(1.1);
     }
 
-    .drop-zone:hover .drop-icon, .drop-zone.dragover .drop-icon {
-      color: var(--primary);
-      transform: scale(1.05);
+    .drop-zone-trip.trip-accent:hover .drop-icon-svg, .drop-zone-trip.trip-accent.dragover .drop-icon-svg {
+      stroke: var(--accent);
+      filter: drop-shadow(0 0 8px var(--accent-glow));
+      transform: scale(1.1);
     }
 
-    .drop-zone-trip:hover .drop-icon, .drop-zone-trip.dragover .drop-icon {
-      color: var(--accent);
-      transform: scale(1.05);
+    .drop-zone-trip.picklist-accent:hover .drop-icon-svg, .drop-zone-trip.picklist-accent.dragover .drop-icon-svg {
+      stroke: var(--primary);
+      filter: drop-shadow(0 0 8px var(--primary-glow));
+      transform: scale(1.1);
     }
 
     .drop-text {
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       font-weight: 500;
       color: var(--text-main);
+      text-align: center;
     }
 
     .drop-text-sm {
       font-size: 0.95rem;
       font-weight: 500;
       color: var(--text-main);
+      text-align: center;
     }
 
     .drop-subtext {
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       color: var(--text-sub);
+      text-align: center;
     }
 
     /* File details panel */
     .file-details {
       display: none;
-      background: rgba(255, 255, 255, 0.03);
+      background: rgba(255, 255, 255, 0.02);
       border: 1px solid var(--card-border);
-      border-radius: 12px;
+      border-radius: 16px;
       padding: 1.25rem;
       flex-direction: column;
-      gap: 0.75rem;
-      animation: fadeIn 0.4s ease-out;
+      gap: 0.85rem;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.01);
+      animation: fadeIn 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
     }
 
     .info-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 0.95rem;
+      font-size: 0.92rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      padding-bottom: 0.6rem;
+    }
+
+    .info-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
     }
 
     .info-label {
@@ -209,107 +328,31 @@
     }
 
     .badge {
-      padding: 0.25rem 0.75rem;
+      padding: 0.3rem 0.8rem;
       border-radius: 9999px;
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       font-weight: 600;
+      letter-spacing: 0.02em;
     }
 
     .badge-data1 {
-      background: rgba(6, 182, 212, 0.15);
+      background: rgba(6, 182, 212, 0.1);
       color: var(--accent);
-      border: 1px solid rgba(6, 182, 212, 0.3);
+      border: 1px solid rgba(6, 182, 212, 0.2);
+      box-shadow: 0 0 12px rgba(6, 182, 212, 0.05);
     }
 
     .badge-data2 {
-      background: rgba(16, 185, 129, 0.15);
-      color: var(--primary);
-      border: 1px solid rgba(16, 185, 129, 0.3);
-    }
-
-    /* Actions / Conversion status */
-    .action-panel {
-      display: none;
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    button.btn-convert {
-      width: 100%;
-      background: linear-gradient(135deg, var(--primary), var(--primary-hover));
-      color: white;
-      border: none;
-      border-radius: 12px;
-      padding: 1rem;
-      font-size: 1.1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
-    }
-
-    button.btn-convert:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);
-    }
-
-    button.btn-convert:active {
-      transform: translateY(0);
-    }
-
-    /* Loader */
-    .progress-container {
-      display: none;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    .progress-bar-bg {
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 9999px;
-      height: 8px;
-      overflow: hidden;
-      width: 100%;
-    }
-
-    .progress-bar {
-      background: var(--primary);
-      height: 100%;
-      width: 0%;
-      transition: width 0.3s ease-out;
-    }
-
-    .progress-text {
-      font-size: 0.9rem;
-      color: var(--text-sub);
-      text-align: center;
-    }
-
-    /* Alert / Messages */
-    .alert {
-      display: none;
-      padding: 1rem;
-      border-radius: 12px;
-      font-size: 0.95rem;
-      line-height: 1.4;
-      animation: fadeIn 0.3s;
-    }
-
-    .alert-success {
       background: rgba(16, 185, 129, 0.1);
+      color: var(--primary);
       border: 1px solid rgba(16, 185, 129, 0.2);
-      color: #34d399;
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.05);
     }
 
-    .alert-error {
-      background: rgba(239, 68, 68, 0.1);
-      border: 1px solid rgba(239, 68, 68, 0.2);
-      color: #f87171;
-    }
-
+    /* Segment Control (Action target) */
     .segment-control {
       display: flex;
-      background: rgba(255, 255, 255, 0.05);
+      background: rgba(0, 0, 0, 0.2);
       border: 1px solid var(--card-border);
       border-radius: 12px;
       padding: 0.25rem;
@@ -334,22 +377,139 @@
 
     .segment-option span {
       display: block;
-      padding: 0.75rem 0.5rem;
+      padding: 0.65rem 0.5rem;
       border-radius: 10px;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       font-weight: 500;
       color: var(--text-sub);
-      transition: all 0.2s ease;
+      transition: all 0.25s ease;
     }
 
     .segment-option input:checked + span {
-      background: var(--primary);
+      background: linear-gradient(135deg, var(--primary), var(--primary-hover));
       color: white;
-      box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2);
+      box-shadow: 0 4px 12px var(--primary-glow);
+    }
+
+    /* Trip/Picklist Load statuses */
+    .trip-status {
+      display: none;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 0.85rem;
+      color: var(--accent);
+      background: rgba(6, 182, 212, 0.06);
+      border: 1px solid rgba(6, 182, 212, 0.15);
+      border-radius: 10px;
+      padding: 0.6rem 0.85rem;
+      margin-top: -0.25rem;
+      animation: fadeIn 0.3s;
+    }
+
+    .trip-status.visible { display: flex; }
+
+    /* Action Panel & Convert Button */
+    .action-panel {
+      display: none;
+      flex-direction: column;
+      gap: 1rem;
+      margin-top: 0.5rem;
+    }
+
+    button.btn-convert {
+      width: 100%;
+      background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+      color: white;
+      border: none;
+      border-radius: 14px;
+      padding: 1.1rem;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      letter-spacing: 0.02em;
+    }
+
+    button.btn-convert:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(16, 185, 129, 0.3);
+      filter: brightness(1.1);
+    }
+
+    button.btn-convert:active {
+      transform: translateY(0);
+    }
+
+    /* Progress and Loaders */
+    .progress-container {
+      display: none;
+      flex-direction: column;
+      gap: 0.5rem;
+      background: rgba(255, 255, 255, 0.01);
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      border-radius: 16px;
+      padding: 1rem;
+    }
+
+    .progress-bar-bg {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 9999px;
+      height: 8px;
+      overflow: hidden;
+      width: 100%;
+    }
+
+    .progress-bar {
+      background: linear-gradient(90deg, var(--accent), var(--primary));
+      height: 100%;
+      width: 0%;
+      transition: width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+      box-shadow: 0 0 10px var(--primary-glow);
+    }
+
+    .progress-text {
+      font-size: 0.85rem;
+      color: var(--text-sub);
+      text-align: center;
+      font-weight: 500;
+    }
+
+    /* Alerts and Messages */
+    .alert {
+      display: none;
+      padding: 1.1rem;
+      border-radius: 14px;
+      font-size: 0.92rem;
+      line-height: 1.5;
+      animation: fadeIn 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+      border-left: 4px solid transparent;
+    }
+
+    .alert-success {
+      background: rgba(16, 185, 129, 0.06);
+      border: 1px solid rgba(16, 185, 129, 0.15);
+      border-left-color: var(--primary);
+      color: #34d399;
+    }
+
+    .alert-error {
+      background: rgba(239, 68, 68, 0.06);
+      border: 1px solid rgba(239, 68, 68, 0.15);
+      border-left-color: var(--error);
+      color: #f87171;
+    }
+
+    /* Easing keyframes */
+    @keyframes pulse {
+      0% { transform: scale(0.95); opacity: 0.5; }
+      50% { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.5; }
     }
 
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(8px); }
+      from { opacity: 0; transform: translateY(12px); }
       to { opacity: 1; transform: translateY(0); }
     }
   </style>
@@ -357,8 +517,12 @@
 <body>
   <div class="container">
     <header>
-      <h1>Wakefit Logistics Converter v1.1</h1>
-      <p class="subtitle">Drag & drop excel files to sync & format sheets instantly</p>
+      <div class="app-status">
+        <span class="status-dot"></span>
+        <span>Wakefit Logistics Tool</span>
+      </div>
+      <h1>Excel Sync Dashboard</h1>
+      <p class="subtitle">Instantly sync, format sheets, map Trip IDs, and attach Picklist logs for dispatch execution</p>
     </header>
 
     <!-- Invisible file inputs -->
@@ -366,66 +530,91 @@
     <input type="file" id="tripFileInput" accept=".xlsx, .csv" style="display: none;">
     <input type="file" id="picklistFileInput" accept=".xlsx" style="display: none;">
 
-    <!-- Step 1: Route Planning File -->
-    <div class="trip-section-label">Step 1 — Route Planning File</div>
-    <div class="drop-zone" id="dropZone">
-      <div class="drop-icon">📊</div>
-      <div class="drop-text" id="dropText">Choose Route Planning file or drag it here</div>
-      <div class="drop-subtext">Supports .xlsx spreadsheets (data 2.xlsx)</div>
-    </div>
+    <div class="dashboard-grid">
+      <!-- Left Panel: Step 1 Primary File -->
+      <div class="panel">
+        <div class="section-card">
+          <div class="trip-section-label">Step 1 — Route Planning File</div>
+          <div class="drop-zone" id="dropZone">
+            <svg class="drop-icon-svg" viewBox="0 0 24 24">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+            </svg>
+            <div class="drop-text" id="dropText">Upload Route Planning file</div>
+            <div class="drop-subtext">Drag & drop or browse .xlsx sheets</div>
+          </div>
+          
+          <div class="file-details" id="fileDetails">
+            <div class="info-row">
+              <span class="info-label">File Name:</span>
+              <span class="info-val" id="fileName">data 2.xlsx</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">File Size:</span>
+              <span class="info-val" id="fileSize">1.08 MB</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Detected Format:</span>
+              <span class="badge" id="fileBadge">data 2 (no Invoice)</span>
+            </div>
+            <div class="info-row" style="flex-direction: column; align-items: flex-start; gap: 0.5rem; width: 100%;">
+              <span class="info-label">Action Target:</span>
+              <div class="segment-control">
+                <label class="segment-option">
+                  <input type="radio" name="conversionMode" id="modeAdd" value="add" checked>
+                  <span>Add / Update Execution Sheets</span>
+                </label>
+                <label class="segment-option">
+                  <input type="radio" name="conversionMode" id="modeRemove" value="remove">
+                  <span>Remove Execution Sheets</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-    <div class="file-details" id="fileDetails">
-      <div class="info-row">
-        <span class="info-label">File Name:</span>
-        <span class="info-val" id="fileName">data 2.xlsx</span>
-      </div>
-      <div class="info-row">
-        <span class="info-label">File Size:</span>
-        <span class="info-val" id="fileSize">1.08 MB</span>
-      </div>
-      <div class="info-row">
-        <span class="info-label">Detected Format:</span>
-        <span class="badge" id="fileBadge">data 2 (no Invoice)</span>
-      </div>
-      <div class="info-row" style="flex-direction: column; align-items: flex-start; gap: 0.5rem; width: 100%;">
-        <span class="info-label">Action Target:</span>
-        <div class="segment-control">
-          <label class="segment-option">
-            <input type="radio" name="conversionMode" id="modeAdd" value="add" checked>
-            <span>Add / Update Execution Sheets (data 1.xlsx)</span>
-          </label>
-          <label class="segment-option">
-            <input type="radio" name="conversionMode" id="modeRemove" value="remove">
-            <span>Remove Execution Sheets (data 2.xlsx)</span>
-          </label>
+      <!-- Right Panel: Step 2 & 3 Optional Files -->
+      <div class="panel">
+        <!-- Step 2: Trip ID File -->
+        <div class="section-card">
+          <div class="trip-section-label">Step 2 — Trip ID File <span style="font-weight:400; color:var(--text-sub); text-transform:none; letter-spacing:0;">(optional)</span></div>
+          <div class="drop-zone-trip trip-accent" id="tripDropZone">
+            <svg class="drop-icon-svg" viewBox="0 0 24 24" style="width: 36px; height: 36px;">
+              <rect x="1" y="3" width="15" height="13" rx="2" ry="2" />
+              <polygon points="16 8 20 8 23 11 23 16 16 16 16 16" />
+              <circle cx="5.5" cy="18.5" r="2.5" />
+              <circle cx="18.5" cy="18.5" r="2.5" />
+            </svg>
+            <div class="drop-text-sm" id="tripDropText">Upload Trip Number file</div>
+            <div class="drop-subtext">Supports .xlsx or .csv files</div>
+          </div>
+          <div class="trip-status" id="tripStatus">
+            <span>✅</span>
+            <span id="tripStatusText">Trip ID file loaded — 0 entries mapped</span>
+          </div>
+        </div>
+
+        <!-- Step 3: Picklist File -->
+        <div class="section-card">
+          <div class="trip-section-label emerald-label">Step 3 — Picklist File <span style="font-weight:400; color:var(--text-sub); text-transform:none; letter-spacing:0;">(optional)</span></div>
+          <div class="drop-zone-trip picklist-accent" id="picklistDropZone" style="border-color: rgba(16, 185, 129, 0.2); background: rgba(16, 185, 129, 0.02);">
+            <svg class="drop-icon-svg" viewBox="0 0 24 24" style="width: 36px; height: 36px;">
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+              <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+              <path d="M9 14h6M9 18h6M9 10h3" />
+            </svg>
+            <div class="drop-text-sm" id="picklistDropText">Upload Picklist file</div>
+            <div class="drop-subtext">Adds Picklist sheet to result doc</div>
+          </div>
+          <div class="trip-status" id="picklistStatus" style="color: var(--primary); background: rgba(16, 185, 129, 0.06); border-color: rgba(16, 185, 129, 0.15);">
+            <span>✅</span>
+            <span id="picklistStatusText">Picklist file loaded — 0 entries mapped</span>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Step 2: Trip ID File (optional) -->
-    <div class="trip-section-label">Step 2 — Trip ID File <span style="font-weight:400; color:var(--text-sub); text-transform:none; letter-spacing:0;">(optional — fills Trip Id column)</span></div>
-    <div class="drop-zone-trip" id="tripDropZone">
-      <div class="drop-icon" style="font-size:2rem;">🚚</div>
-      <div class="drop-text-sm" id="tripDropText">Upload Trip Number file here</div>
-      <div class="drop-subtext">Supports .xlsx or .csv files (e.g. Order sheet)</div>
-    </div>
-    <div class="trip-status" id="tripStatus">
-      <span>✅</span>
-      <span id="tripStatusText">Trip ID file loaded — 0 entries mapped</span>
-    </div>
-
-    <!-- Step 3: Picklist File (optional) -->
-    <div class="trip-section-label">Step 3 — Picklist File <span style="font-weight:400; color:var(--text-sub); text-transform:none; letter-spacing:0;">(optional — matches FG01/RTP1 Type)</span></div>
-    <div class="drop-zone-trip" id="picklistDropZone" style="border-color: rgba(16, 185, 129, 0.35); background: rgba(16, 185, 129, 0.04);">
-      <div class="drop-icon" style="font-size:2rem; color: var(--primary);">📋</div>
-      <div class="drop-text-sm" id="picklistDropText">Upload Picklist file here</div>
-      <div class="drop-subtext">File must have: docket_number and area columns</div>
-    </div>
-    <div class="trip-status" id="picklistStatus" style="color: var(--primary); background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.2);">
-      <span>✅</span>
-      <span id="picklistStatusText">Picklist file loaded — 0 entries mapped</span>
-    </div>
-
+    <!-- Actions, Progress & Message Panel -->
     <div class="progress-container" id="progressContainer">
       <div class="progress-bar-bg">
         <div class="progress-bar" id="progressBar"></div>
