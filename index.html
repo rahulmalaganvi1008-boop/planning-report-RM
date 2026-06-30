@@ -520,6 +520,7 @@
     // Lookup map: consignmentNumber (UPPERCASE) -> tripNumber
     let tripIdMap = {};
     let picklistMap = {};
+    let picklistRawRows = []; // [headerArray, ...dataArrays] from uploaded picklist
 
     // ── Route Planning file drag & drop ──────────────────────────
     dropZone.addEventListener('click', () => fileInput.click());
@@ -722,15 +723,24 @@
             if (docketColIdx === -1) docketColIdx = 2; // Default Col B
             if (areaColIdx === -1) areaColIdx = 6;     // Default Col F
 
+            const newRawRows = [];
             ws.eachRow((row, rowNumber) => {
-              if (rowNumber === 1) return; // skip header
+              // Capture every row (header + data) as plain text array
+              const rowVals = [];
+              row.eachCell({ includeEmpty: true }, (cell) => rowVals.push(getCellText(cell)));
+              if (rowNumber === 1) {
+                newRawRows.push(rowVals); // header
+                return;
+              }
               const docket = getCellText(row.getCell(docketColIdx)).toUpperCase();
               const area = getCellText(row.getCell(areaColIdx));
               if (docket && area) {
                 newMap[docket] = area;
                 count++;
               }
+              newRawRows.push(rowVals); // data row (all rows, not just matched)
             });
+            picklistRawRows = newRawRows;
 
             picklistMap = newMap;
             picklistDropText.textContent = file.name;
@@ -844,6 +854,7 @@
               workbook.removeWorksheet('TRIP ID');
               workbook.removeWorksheet('SER-PARTS');
               workbook.removeWorksheet('ROUTE');
+              workbook.removeWorksheet('Picklist');
               
               progressBar.style.width = '85%';
               progressText.textContent = 'Writing Excel output...';
@@ -869,6 +880,8 @@
               if (existingTrip) workbook.removeWorksheet('TRIP ID');
               const existingInv = workbook.getWorksheet('INVOICE');
               if (existingInv) workbook.removeWorksheet('INVOICE');
+              const existingPicklist = workbook.getWorksheet('Picklist');
+              if (existingPicklist) workbook.removeWorksheet('Picklist');
 
               // Add worksheets
               const wsRouteOut = workbook.addWorksheet('ROUTE');
@@ -1494,6 +1507,52 @@
               wsSerParts.views = [{ showGridLines: true }];
               wsTrip.views     = [{ showGridLines: true }];
               wsRouteOut.views = [{ showGridLines: true }];
+
+              // Add Picklist sheet if a picklist file was uploaded
+              let wsPicklist = null;
+              if (picklistRawRows.length > 0) {
+                wsPicklist = workbook.addWorksheet('Picklist');
+                const [plHeaders, ...plDataRows] = picklistRawRows;
+
+                // Set column widths based on header count
+                wsPicklist.columns = plHeaders.map((h, i) => ({
+                  header: h,
+                  key: 'col' + i,
+                  width: 22
+                }));
+
+                // Style header row
+                const plHeaderRow = wsPicklist.getRow(1);
+                plHeaderRow.height = 14.5;
+                plHeaderRow.eachCell({ includeEmpty: true }, (cell) => {
+                  cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF000000' } };
+                  cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE1EBE1' } };
+                  cell.border = {
+                    top:    { style: 'thin', color: { argb: 'FF000000' } },
+                    left:   { style: 'thin', color: { argb: 'FF000000' } },
+                    bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                    right:  { style: 'thin', color: { argb: 'FF000000' } }
+                  };
+                });
+
+                // Populate data rows
+                for (const rowData of plDataRows) {
+                  const newRow = wsPicklist.addRow(rowData);
+                  newRow.height = 14.5;
+                  newRow.eachCell({ includeEmpty: true }, (cell) => {
+                    cell.font = { name: 'Calibri', size: 11, color: { argb: 'FF000000' } };
+                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                    cell.border = {
+                      top:    { style: 'thin', color: { argb: 'FF000000' } },
+                      left:   { style: 'thin', color: { argb: 'FF000000' } },
+                      bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                      right:  { style: 'thin', color: { argb: 'FF000000' } }
+                    };
+                  });
+                }
+                wsPicklist.views = [{ showGridLines: true }];
+              }
               
               progressBar.style.width = '85%';
               progressText.textContent = 'Formatting and packaging...';
@@ -1503,7 +1562,7 @@
               
               progressBar.style.width = '100%';
               progressContainer.style.display = 'none';
-              showMessage(`Successfully generated sheets (INVOICE: ${invoiceCount} rows, SER-PARTS: ${serPartsCount} rows, ROUTE: ${routeCount} rows) and downloaded ${outputFileName}!`, 'success');
+              showMessage(`Successfully generated sheets (INVOICE: ${invoiceCount} rows, SER-PARTS: ${serPartsCount} rows, ROUTE: ${routeCount} rows${wsPicklist ? ', Picklist included' : ''}) and downloaded ${outputFileName}!`, 'success');
               // Bring back the Convert button so user can download again without refreshing
               actionPanel.style.display = 'flex';
             }
